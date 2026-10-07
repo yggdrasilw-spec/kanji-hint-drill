@@ -1,0 +1,23 @@
+{
+  "curriculum": "ユーザー提供の令和8年度 東京書籍 新編 新しい国語の画面画像を転記。学習月ではなく教材の単元・掲載ページ。読み方の単元初出は未転記。",
+  "strokeData": {
+    "source": "https://kanjivg.tagaini.net/",
+    "author": "Ulrich Apel",
+    "license": "CC BY-SA 3.0",
+    "localSource": "既存のkakijun/svg"
+  },
+  "vocabulary": {
+    "sources": [
+      "https://www.edrdg.org/kanjidic/kanjidic2.xml.gz",
+      "https://www.edrdg.org/pub/Nihongo/JMdict_e.gz"
+    ],
+    "author": "Electronic Dictionary Research and Development Group",
+    "license": "CC BY-SA 4.0",
+    "description": "辞書の語彙例＋独自の低学年語彙。語彙に含まれる漢字は出題範囲・既習学年で絞る。教科書での読みの既習は保証しない。"
+  },
+  "recognition": {
+    "source": "https://github.com/dariyooo/DaKanji-Single-Kanji-Recognition/releases/tag/v2.0",
+    "author": "Dariyooo (DaAppLab)",
+    "license": "MIT"
+  }
+}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ひとふでヒント — 漢字ドリル</title><link rel="stylesheet" href="style.css"><script src="assets/ort.wasm.min.js" defer></script><script type="module" src="app.mjs"></script></head>
+<body>
+<header><a class="brand" href="./"><span class="brand-icon">一</span><span>ひとふでヒント<small>漢字を、思い出す練習。</small></span></a><nav aria-label="画面を選ぶ"><button id="setupTab" class="tab active">出題の範囲</button><button id="progressTab" class="tab">学習の記録</button></nav></header>
+<main>
+<section id="setupView">
+ <div class="intro"><span class="eyebrow">東京書籍 · 新編 新しい国語</span><h1>今日は、どの単元を練習する？</h1><p>学年を選んで、練習したい単元にチェック。<br class="mobile">わすれた字は、1画目から思い出そう。</p></div>
+ <div class="setup-grid"><div class="card unit-panel">
+  <div class="panel-top"><label class="grade-label" for="grade">学年 <select id="grade"><option value="1">1年生</option><option value="2">2年生</option><option value="3">3年生</option><option value="4">4年生</option><option value="5">5年生</option><option value="6">6年生</option></select></label><div class="selection-actions"><button id="selectAll" class="text-button">全部えらぶ</button><button id="selectNone" class="text-button">チェックを外す</button></div></div>
+  <p class="unit-help">単元をタップして選びます。「ここまで」は、それまでの単元をまとめて選びます。</p>
+  <div id="units" aria-label="単元の一覧"><p>漢字のデータを読み込んでいます…</p></div>
+ </div><aside class="card summary-panel"><span class="eyebrow">えらんだ範囲</span><div class="big-count"><strong id="scopeCount">0</strong><span>字</span></div><p id="selectionSummary">単元をえらんでね。</p><div id="scopePreview" class="char-preview"></div>
+  <label class="option"><input type="checkbox" id="multiple" checked><span>いろいろな読み方で出す<small>ことばを変えて、同じ字も練習します。</small></span></label>
+  <label class="length-label" for="sessionLength">1回の問題数 <select id="sessionLength"><option value="5">5問</option><option value="10" selected>10問</option><option value="20">20問</option></select></label>
+  <button id="start" class="primary wide" disabled>練習をはじめる <span>→</span></button><p id="modelStatus" class="status" role="status">手書きの判定を準備しています…</p>
+  <p class="small-note">問題のほかの漢字は、選んだ範囲と前の学年までの字を使います。読み方は辞書の語彙から出題します。</p>
+ </aside></div>
+</section>
+<section id="drillView" hidden>
+ <div class="drill-top"><button id="back" class="text-button">← 範囲に戻る</button><span id="position"></span><span id="sessionBadge" class="badge"></span></div><div class="progress-track"><div id="progressFill"></div></div>
+ <div class="drill-layout"><div class="card exercise">
+  <span class="eyebrow">□に入る漢字を、1字書こう</span><p id="reading" class="reading"></p><h1 id="masked" class="masked"></h1><p id="cue" class="cue"></p>
+  <div class="writing-area"><svg id="guide" viewBox="0 0 109 109" aria-hidden="true"></svg><canvas id="canvas" width="480" height="480" aria-label="漢字を書く場所"></canvas><span class="corner">ここに書いてね</span></div>
+  <div class="canvas-tools"><button id="undo">1画もどす</button><button id="clear">全部けす</button><span id="strokeCount">0画</span></div>
+  <button id="check" class="primary wide">できた！ 判定する</button>
+ </div><aside class="card hint-panel"><span class="eyebrow">思い出すためのヒント</span><h2>あと少しで、思い出せそう。</h2><p>まずは自分で書いてみよう。<br>むずかしいときは、1画ずつ。</p><button id="hint" class="hint-button"><span class="hint-icon">一</span><span>1画目を見せて<small>書き出しを思い出すヒント</small></span></button><button id="answer" class="text-button answer-button">答えと書き順を見る</button>
+  <div id="feedback" class="feedback" role="status" aria-live="polite"></div><div id="confirmation" hidden><p>自分で書いた字と、答えを比べてね。</p><div class="two-buttons"><button id="selfCorrect">合っている</button><button id="selfWrong">もう一度練習</button></div></div>
+  <button id="next" class="primary wide" hidden>次の問題へ →</button><div class="practice-note"><strong>思い出せたら、また後で。</strong><p>ヒントを使った字や間違えた字は、少し間をあけてもう一度。自力で書けた字は、翌日以降に復習します。</p></div>
+ </aside></div>
+</section>
+<section id="resultView" hidden class="card result-panel"><span class="eyebrow">今日の練習</span><h1>おつかれさま！</h1><p id="resultMessage"></p><div id="resultCounts" class="result-counts"></div><div id="resultItems"></div><div class="two-buttons"><button id="restart" class="primary">もう一度練習する</button><button id="finish">範囲にもどる</button></div></section>
+<section id="recordView" hidden><div class="intro"><span class="eyebrow">少しずつ、思い出せる字を増やそう</span><h1>学習の記録</h1><p>記録は、この端末のブラウザに保存されます。</p></div><div id="recordSummary" class="record-counts"></div><div class="card"><div class="panel-top"><h2>復習したい字</h2><button id="export" class="text-button">記録を書き出す</button><label class="text-button import-label">記録を読み込む<input id="import" type="file" accept="application/json" hidden></label></div><div id="recordList"></div><p id="storageMessage" role="status"></p></div></section>
+<p id="fatal" role="alert" hidden></p>
+</main>
+<footer><span>ひとふでヒント</span><details><summary>教材・認識モデルの出典</summary><p>単元対応：ユーザー提供の東京書籍「新編 新しい国語」の教科書画面を転記。</p><p>筆順：<a href="https://kanjivg.tagaini.net/">KanjiVG</a> — Ulrich Apel · <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>。語彙・読み：<a href="https://www.edrdg.org/">EDRDG / JMdict・KANJIDIC2</a> · <a href="https://www.edrdg.org/edrdg/licence.html">CC BY-SA 4.0</a>。</p><p>Character recognition powered by machine learning from <a href="https://github.com/dariyooo/DaKanji-Single-Kanji-Recognition">Dariyooo (DaAppLab)</a> · MIT。<a href="assets/DAKANJI-LICENSE.txt">ライセンス</a> / <a href="assets/ONNXRUNTIME-LICENSE.txt">ONNX Runtime · MIT</a></p><p>自動判定は参考です。判定がはっきりしないときは、答えと比べて確認します。書いた画像は外部に送信しません。</p></details></footer>
+</body></html>
