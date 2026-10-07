@@ -4,13 +4,13 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'qa');fs.mkdirSync(ou
 const data=JSON.parse(fs.readFileSync(path.join(root,'data/curriculum.json')));
 async function drawChar(page,char){
  const points=await page.evaluate(paths=>paths.map(d=>{const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);const len=p.getTotalLength();return Array.from({length:30},(_,i)=>{const pt=p.getPointAtLength(i*len/29);return{x:pt.x,y:pt.y};});}),data.glyphs[char].paths);
- const box=await page.locator('#canvas').boundingBox();for(const s of points){await page.mouse.move(box.x+s[0].x/109*box.width,box.y+s[0].y/109*box.height);await page.mouse.down();for(const p of s.slice(1))await page.mouse.move(box.x+p.x/109*box.width,box.y+p.y/109*box.height);await page.mouse.up();}
+ await page.locator('#canvas').scrollIntoViewIfNeeded();const box=await page.locator('#canvas').boundingBox();for(const s of points){await page.mouse.move(box.x+s[0].x/109*box.width,box.y+s[0].y/109*box.height);await page.mouse.down();for(const p of s.slice(1))await page.mouse.move(box.x+p.x/109*box.width,box.y+p.y/109*box.height);await page.mouse.up();}
 }
 function questionChar(masked,reading){return Object.entries(data.glyphs).find(([c,g])=>g.words.some(w=>w.word.replace(c,'□')===masked&&w.reading===reading))?.[0];}
 let activeBrowser;
 (async()=>{
  const browser=activeBrowser=await chromium.launch({headless:true,channel:'msedge'});const page=await browser.newPage({viewport:{width:1280,height:950}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='warning'||m.type()==='error')console.log('BROWSER',m.text().slice(0,700));});
- await page.goto('http://127.0.0.1:8897/');await page.waitForFunction(()=>document.getElementById('modelStatus').textContent.includes('使えます')||document.getElementById('modelStatus').textContent.includes('読み込めません'),{timeout:120000});
+ await page.goto((process.env.APP_URL||(process.env.APP_URL||'http://127.0.0.1:8897/')));await page.waitForFunction(()=>document.getElementById('modelStatus').textContent.includes('使えます')||document.getElementById('modelStatus').textContent.includes('読み込めません'),{timeout:120000});
  console.log('MODEL',await page.locator('#modelStatus').innerText());assert.match(await page.locator('#modelStatus').innerText(),/使えます/);
  await page.screenshot({path:path.join(out,'setup-desktop.png'),fullPage:true});
  for(let g=1;g<=6;g++){await page.selectOption('#grade',String(g));await page.click('#selectNone');assert.equal(await page.locator('#start').isDisabled(),true);await page.locator('#units input').first().check();assert.ok(Number(await page.locator('#scopeCount').innerText())>0);await page.locator('#units .until').nth(2).click();assert.equal(await page.locator('#units input:checked').count(),3);}
@@ -30,7 +30,7 @@ let activeBrowser;
  let attempts=0;while(await page.locator('#drillView').isVisible()){if(await page.locator('#next').isVisible())await page.click('#next');else await page.click('#answer');if(++attempts>40)throw Error('Unbounded retry loop');}
  assert.ok(await page.locator('#resultView').isVisible());assert.match(await page.locator('#resultMessage').innerText(),/練習しました/);
  assert.ok(Number((await page.locator('#resultMessage').innerText()).match(/\d+/)[0])<=14);
- const fallback=await browser.newPage();await fallback.route('**/assets/recognizer.onnx',route=>route.abort());await fallback.goto('http://127.0.0.1:8897/');await fallback.waitForFunction(()=>document.getElementById('modelStatus').textContent.includes('読み込めません'));
+ const fallback=await browser.newPage();await fallback.route('**/assets/recognizer.onnx',route=>route.abort());await fallback.goto((process.env.APP_URL||(process.env.APP_URL||'http://127.0.0.1:8897/')));await fallback.waitForFunction(()=>document.getElementById('modelStatus').textContent.includes('読み込めません'));
  await fallback.click('#start');await drawChar(fallback,'一');await fallback.click('#check');assert.ok(await fallback.locator('#confirmation').isVisible());
  assert.equal(await fallback.evaluate(()=>localStorage.getItem('kanji-hint-drill-v1')),null);await fallback.click('#selfCorrect');const manual=await fallback.evaluate(()=>JSON.parse(localStorage.getItem('kanji-hint-drill-v1')));assert.equal(Object.values(manual.records)[0].correct,0);assert.equal(Object.values(manual.records)[0].helped,1);
  await fallback.click('#progressTab');await fallback.locator('#import').setInputFiles({name:'record.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({version:1,records:{'一|一つ|ひとつ':{attempts:3,correct:3,stage:3,streak:3,due:Date.now()+86400000,lastSeen:Date.now()+1000,history:[]}}}))});await fallback.waitForFunction(()=>document.getElementById('storageMessage').textContent.includes('読み込みました'));assert.ok(await fallback.locator('.record-row').count()>=1);
