@@ -57,13 +57,20 @@ function referenceStrokes(){return data.glyphs[current.char].paths.map(d=>{const
 function begin(){
  refreshScope();if(!questions.length)return;queue=buildQueue(questions,store.records,+settings.length);queueLimit=queue.length+4;queueIndex=0;results=[];show('drillView');loadQuestion();
 }
+function renderSentence(q,isRead){
+ const sentence=$('masked');sentence.replaceChildren();sentence.classList.add('sentence');sentence.dataset.questionId=q.id;
+ const target=document.createElement(isRead?'span':'ruby');target.id='sentenceTarget';target.className='sentence-target';
+ const base=document.createElement('span');base.className='target-text';base.textContent=isRead?q.displayWord:q.masked;target.append(base);
+ if(!isRead){const rt=document.createElement('rt');rt.textContent=q.reading;target.append(rt);}
+ sentence.append(document.createTextNode(q.before),target,document.createTextNode(q.after));
+}
 function loadQuestion(){
  reader?.stop();token++;if(queueIndex>=queue.length){renderResults();return;}
  current=queue[queueIndex];strokes=[];drawing=null;hints=current.requiresHint?1:0;answerSeen=false;judged=false;busy=false;
- const isRead=current.mode==='read';$('readingControls').hidden=!isRead;$('writingBox').hidden=false;$('kanaTools').hidden=true;$('questionInstruction').textContent=isRead?'この ことばを よんでね':'□の かんじを １もじ かこう';$('reading').hidden=isRead;
- $('reading').textContent=current.reading;$('masked').textContent=isRead?current.word:current.masked;$('cue').textContent=current.requiresHint?'読み方だけでは別の字もあるので、1画目をヒントに書こう。':'読みをたよりに、□の字を思い出そう。';
+ const isRead=current.mode==='read';$('readingControls').hidden=!isRead;$('writingBox').hidden=false;$('kanaTools').hidden=true;$('questionInstruction').textContent=isRead?'ぶんを よんで、いろの ついた ことばを よもう':'ぶんを よんで、□の かんじを かこう';$('reading').hidden=true;
+ $('reading').textContent=current.reading;renderSentence(current,isRead);$('cue').textContent='よみがなと ぶんを ヒントに、□の かんじを かいてね。';
  $('position').textContent=`${queueIndex+1} / ${queue.length}問`;$('sessionBadge').textContent=store.records[current.id]?.errors?'復習':'練習';$('progressFill').style.width=(queueIndex/queue.length*100)+'%';
- $('feedback').textContent='';$('feedback').className='feedback';$('next').hidden=true;$('confirmation').hidden=true;$('answer').disabled=false;$('clear').disabled=false;$('undo').disabled=false;$('check').textContent='できた！ たしかめる 🌸';if(isRead){$('cue').textContent='ことば ぜんぶの よみを こたえてね。';reader.unlock();reader.reset();}renderGuide();redraw();
+ $('feedback').textContent='';$('feedback').className='feedback';$('next').hidden=true;$('confirmation').hidden=true;$('answer').disabled=false;$('clear').disabled=false;$('undo').disabled=false;$('check').textContent='できた！ たしかめる 🌸';if(isRead){$('cue').textContent='いろの ついた ぶぶんの よみを、こたえてね。';reader.unlock();reader.reset();}renderGuide();redraw();
 }
 async function recognize(kind='kanji'){
  if(!modelReady)throw Error('Model unavailable');
@@ -114,7 +121,7 @@ function renderRecords(){
  const entries=Object.entries(store.records);metrics($('recordSummary'),[['練習したことば',entries.length],['復習の時期',entries.filter(([,r])=>r.due<=Date.now()).length],['自力で3回以上',entries.filter(([,r])=>r.stage>=3&&r.streak>=3).length]]);$('recordList').replaceChildren();
  if(!entries.length){const p=document.createElement('p');p.textContent='まだ記録はありません。単元を選んで練習してみよう。';$('recordList').append(p);return;}
  for(const [id,r] of entries.sort((a,b)=>a[1].due-b[1].due).slice(0,100)){
-  const [char,word,reading,mode]=id.split('|');const row=document.createElement('div');row.className='record-row';const c=document.createElement('strong');c.className='record-char';c.textContent=char;const detail=document.createElement('div');detail.className='record-detail';detail.textContent=`${word==='direct'?char:word}（${reading}）・${mode==='read'?'よむ':'かく'}`;const small=document.createElement('small');small.textContent=`自力 ${r.correct}回 · ヒント ${r.helped}回 · 練習し直し ${r.errors}回`;detail.append(small);
+  const [char,word,reading]=id.split('|');const mode=id.split('|').at(-1);const row=document.createElement('div');row.className='record-row';const c=document.createElement('strong');c.className='record-char';c.textContent=char;const detail=document.createElement('div');detail.className='record-detail';detail.textContent=`${word==='direct'?char:word}（${reading}）・${mode==='read'?'よむ':'かく'}`;const small=document.createElement('small');small.textContent=`自力 ${r.correct}回 · ヒント ${r.helped}回 · 練習し直し ${r.errors}回`;detail.append(small);
   const issues=[...new Set(r.history.map(h=>h.reason).filter(Boolean))];if(issues.length){const reason=document.createElement('small');reason.className='reason-label';reason.textContent='見直すところ：'+issues.map(x=>reasonNames[x]||'ヒントで確認').join('、');detail.append(reason);}
   const due=document.createElement('span');due.className='badge';due.textContent=r.due<=Date.now()?'今、復習しよう':new Date(r.due).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'})+'に復習';row.append(c,detail,due);$('recordList').append(row);
  }

@@ -6,17 +6,17 @@
 <main>
 <section id="setupView">
  <div class="intro welcome"><div><span class="eyebrow">まいにち ちょっと、かんじと なかよし。</span><h1>ひとふでで、<br>ぴん！と ひらめく。</h1><p>かいて、よんで。きょうは どっちで あそぶ？</p></div><div class="mascot" aria-hidden="true"><span class="mascot-star">✦</span><div class="bird"><i></i><i></i><b>▾</b></div><span class="mascot-message">いっしょに やろう！</span></div></div>
- <fieldset class="mode-picker"><legend><span class="step">１</span> あそびかたを えらぼう</legend><label><input type="radio" name="mode" value="write" checked><span class="mode-picture">✏️</span><span><strong>かんじを かく</strong><small>よみを みて、かんじを かこう</small></span></label><label><input type="radio" name="mode" value="read"><span class="mode-picture">🌷</span><span><strong>よみを こたえる</strong><small>かんじを みて、ひらがなで こたえよう</small></span></label></fieldset>
+ <fieldset class="mode-picker"><legend><span class="step">１</span> あそびかたを えらぼう</legend><label><input type="radio" name="mode" value="write" checked><span class="mode-picture">✏️</span><span><strong>かんじを かく</strong><small>ぶんを ヒントに、かんじを かこう</small></span></label><label><input type="radio" name="mode" value="read"><span class="mode-picture">🌷</span><span><strong>よみを こたえる</strong><small>ぶんの なかの ことばを よもう</small></span></label></fieldset>
  <div class="layout-setting"><span>もんだいの むき</span><button id="verticalToggle" aria-pressed="true">たてがき ↕</button></div>
  <div class="setup-grid"><div class="card unit-panel">
   <h2 class="step-title"><span class="step">２</span> がくねんと ことばを えらぼう</h2><div class="panel-top"><label class="grade-label" for="grade">学年 <select id="grade"><option value="1">1年生</option><option value="2">2年生</option><option value="3">3年生</option><option value="4">4年生</option><option value="5">5年生</option><option value="6">6年生</option></select></label><div class="selection-actions"><button id="selectAll" class="text-button">全部えらぶ</button><button id="selectNone" class="text-button">チェックを外す</button></div></div>
   <p class="unit-help">れんしゅうしたい ところを おしてね。「ここまで」で まとめて えらべるよ。</p>
   <div id="units" aria-label="単元の一覧"><p>漢字のデータを読み込んでいます…</p></div>
  </div><aside class="card summary-panel"><h2 class="step-title"><span class="step">３</span> さあ、はじめよう！</h2><div class="big-count"><strong id="scopeCount">0</strong><span>字</span></div><p id="selectionSummary">単元をえらんでね。</p><div id="scopePreview" class="char-preview"></div>
-  <label class="option"><input type="checkbox" id="multiple" checked><span>いろいろな読み方で出す<small>ことばを変えて、同じ字も練習します。</small></span></label>
+  <label class="option"><input type="checkbox" id="multiple" checked><span>いろいろな読み方で出す<small>いろいろな文で、同じ字も練習します。</small></span></label>
   <label class="length-label" for="sessionLength">1回の問題数 <select id="sessionLength"><option value="5">5問</option><option value="10" selected>10問</option><option value="20">20問</option></select></label>
   <button id="start" class="primary wide" disabled>あそびに いこう！ <span>→</span></button><p id="modelStatus" class="status" role="status">手書きの判定を準備しています…</p>
-  <p class="small-note">問題のほかの漢字は、選んだ範囲と前の学年までの字を使います。読み方は辞書の語彙から出題します。</p>
+  <p class="small-note">例文の中で、漢字の意味を考えて練習します。まだ習っていない漢字は、ひらがなで表示します。</p>
  </aside></div>
 </section>
 <section id="drillView" hidden>

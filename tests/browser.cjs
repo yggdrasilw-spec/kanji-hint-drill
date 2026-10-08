@@ -15,7 +15,7 @@ let activeBrowser;
  await page.screenshot({path:path.join(out,'setup-desktop.png'),fullPage:true});
  for(let g=1;g<=6;g++){await page.selectOption('#grade',String(g));await page.click('#selectNone');assert.equal(await page.locator('#start').isDisabled(),true);await page.locator('#units input').first().check();assert.ok(Number(await page.locator('#scopeCount').innerText())>0);await page.locator('#units .until').nth(2).click();assert.equal(await page.locator('#units input:checked').count(),3);}
  await page.selectOption('#grade','2');await page.click('#selectNone');await page.locator('#units input').first().check();await page.click('#start');
- const masked=await page.locator('#masked').innerText(),reading=await page.locator('#reading').innerText(),char=questionChar(masked,reading);assert.ok(char,masked+' '+reading);console.log('QUESTION',char,masked,reading);
+ const masked=await page.locator('#masked').innerText(),reading=await page.locator('#reading').textContent(),char=(await page.locator('#masked').getAttribute('data-question-id')).split('|')[0];assert.ok(char,masked+' '+reading);console.log('QUESTION',char,masked,reading);
  assert.equal(await page.locator('#check').isDisabled(),true);await drawChar(page,char);assert.equal(await page.locator('#strokeCount').innerText(),data.glyphs[char].paths.length+'画');
  await page.click('#check');await page.waitForFunction(()=>!document.getElementById('next').hidden||!document.getElementById('confirmation').hidden,{timeout:60000});console.log('JUDGEMENT',await page.locator('#feedback').innerText());
  assert.match(await page.locator('#feedback').innerText(),/正解！/);assert.equal(await page.locator('#confirmation').isVisible(),false);

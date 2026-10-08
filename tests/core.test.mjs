@@ -7,7 +7,7 @@ for(const g of data.grades){
  const ids=g.units.map(u=>u.id),chars=selectScope(data,g.grade,ids);assert.equal(chars.length,new Set(chars).size);
  assert.deepEqual(selectScope(data,g.grade,[]),[]);assert.deepEqual(questionsFor(data,g.grade,[]),[]);
  for(const u of g.units){const qs=questionsFor(data,g.grade,[u.id]);const scope=new Set(selectScope(data,g.grade,[u.id]));assert.ok(qs.length>0,`No questions for ${u.title}`);
-  for(const q of qs){assert.ok(scope.has(q.char));assert.equal([...q.word].filter(c=>c===q.char).length,1);for(const c of q.word)if(data.glyphs[c])assert.ok(scope.has(c)||data.glyphs[c].grade<g.grade,`Unlearned ${c} in ${q.word}`);}
+  for(const q of qs){assert.ok(scope.has(q.char));assert.equal([...q.word].filter(c=>c===q.char).length,1);for(const c of q.displayWord)if(data.glyphs[c])assert.ok(scope.has(c)||data.glyphs[c].grade<g.grade,`Unlearned ${c} in ${q.word}`);}
  }
 }
 const now=1700000000000;let r=updateRecord(null,{type:'wrong'},now);assert.equal(r.due,now);assert.equal(r.stage,0);

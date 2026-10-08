@@ -1,0 +1,9 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';
+import {sentenceBank} from '../sentences.mjs';import {selectScope,questionsFor} from '../core.mjs';import {readingQuestions} from '../reading.mjs';
+const data=JSON.parse(fs.readFileSync(new URL('../data/curriculum.json',import.meta.url)));
+for(const s of sentenceBank){assert.equal(s.template.split('{}').length,2);assert.equal(/[\p{Script=Han}()]/u.test(s.template),false,s.template);assert.match(s.reading,/^[ぁ-ゖー]+$/u);assert.ok(s.template.endsWith('。'));assert.ok(s.template.replace('{}','').length>=8);for(const p of s.parts)if(/[\p{Script=Han}]/u.test(p.text))assert.match(p.reading,/^[ぁ-ゖー]+$/u);}
+for(const grade of data.grades)for(const unit of grade.units){const chars=selectScope(data,grade.grade,[unit.id]),qs=questionsFor(data,grade.grade,[unit.id]);assert.deepEqual(new Set(qs.map(q=>q.char)),new Set(chars),`Missing sentence in ${unit.title}`);for(const q of qs){assert.equal(q.requiresHint,false);assert.equal([...q.masked].filter(c=>c==='□').length,1);assert.ok((q.before+q.after).length>=8);assert.ok(q.sentence.includes(q.displayWord));const read=readingQuestions([q],data)[0];assert.deepEqual(read.acceptedReadings,[q.reading]);}}
+const all=questionsFor(data,1,data.grades[0].units.map(u=>u.id));const rain=all.find(q=>q.char==='雨');assert.match(rain.sentence,/かさ/);const ear=all.find(q=>q.char==='耳');const eye=all.find(q=>q.char==='目');assert.notEqual(ear.before+ear.after,eye.before+eye.after);
+assert.ok(all.filter(q=>q.char==='木').every(q=>!q.word.includes('栃')),'Do not use grade-four prefecture names to teach grade-one 木');
+const upper=questionsFor(data,6,data.grades[5].units.map(u=>u.id));assert.equal(new Set(upper.map(q=>q.char)).size,191);
+console.log(`PASS: ${sentenceBank.length} original sentences cover all 1026 characters in every unit, context is always shown, unknown kanji become kana, contextual readings and no automatic stroke hints`);

@@ -2,7 +2,7 @@ const {chromium}=require('C:/Users/user/.cache/codex-runtimes/codex-primary-runt
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..'),data=JSON.parse(fs.readFileSync(path.join(root,'data/curriculum.json'))),kana=JSON.parse(fs.readFileSync(path.join(root,'data/kana.json')));let browser;
 async function draw(page,paths){const strokes=await page.evaluate(ds=>ds.map(d=>{const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);const l=p.getTotalLength();return Array.from({length:25},(_,i)=>{const p2=p.getPointAtLength(l*i/24);return{x:p2.x,y:p2.y};});}),paths);await page.locator('#canvas').scrollIntoViewIfNeeded();const box=await page.locator('#canvas').boundingBox();for(const s of strokes){await page.mouse.move(box.x+s[0].x/109*box.width,box.y+s[0].y/109*box.height);await page.mouse.down();for(const p of s.slice(1))await page.mouse.move(box.x+p.x/109*box.width,box.y+p.y/109*box.height);await page.mouse.up();}}
-async function q(page){const word=await page.locator('#masked').innerText();return Object.values(data.glyphs).flatMap(g=>g.words).find(w=>w.word===word);}
+async function q(page){const id=await page.locator('#masked').getAttribute('data-question-id');const [char,word,reading]=id.split('|');return {char,word,reading};}
 (async()=>{
  browser=await chromium.launch({headless:true,channel:'msedge'});const context=await browser.newContext({viewport:{width:1280,height:1000}});
  await context.addInitScript(()=>{class FakeSpeech{start(){window.testSpeech=this;}abort(){this.onend?.();}}window.SpeechRecognition=FakeSpeech;});

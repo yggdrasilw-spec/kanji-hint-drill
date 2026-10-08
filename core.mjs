@@ -1,3 +1,4 @@
+import {sentenceQuestions} from './sentences.mjs';
 export const STORAGE_KEY='kanji-hint-drill-v1';
 export const DAY=86400000;
 export function selectScope(data,grade,unitIds){
@@ -5,29 +6,7 @@ export function selectScope(data,grade,unitIds){
  return [...new Set((g?.units||[]).filter(u=>selected.has(u.id)).flatMap(u=>[...u.newCharacters.map(c=>c.text),...(u.readingAdditions||[]).flatMap(c=>[...c.text].filter(ch=>data.glyphs[ch]))]))];
 }
 export function questionsFor(data,grade,unitIds,multiple=true){
- const chars=selectScope(data,grade,unitIds),known=new Set(chars);
- Object.entries(data.glyphs).forEach(([c,g])=>{if(g.grade<Number(grade))known.add(c);});
- const questions=[];
- for(const char of chars){
-  const glyph=data.glyphs[char];
-  const words=glyph.words.filter(w=>[...w.word].every(c=>!data.glyphs[c]||known.has(c)))
-   .sort((a,b)=>a.rank-b.rank||a.word.length-b.word.length);
-  const unique=[];
-  for(const w of words)if(!unique.some(a=>a.word===w.word&&a.reading===w.reading))unique.push(w);
-  // Keep multiple real vocabulary readings; no unlearned kanji in surrounding text.
-  for(const w of unique.slice(0,multiple?5:1))questions.push({id:`${char}|${w.word}|${w.reading}`,char,word:w.word,reading:w.reading,masked:w.word.replace(char,'□'),requiresHint:false});
-  if(!unique.length){
-   const r=glyph.readings.find(r=>r.type==='訓')||glyph.readings[0];
-   if(!r)continue;
-   const reading=r.reading.replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/[-.]/g,'');
-   questions.push({id:`${char}|direct|${reading}`,char,word:char,reading,masked:'□',requiresHint:true});
-  }
- }
- // A bare reading or a homophone with the same surrounding characters needs a stroke cue.
- const alternatives=new Map();
- for(const q of questions){const key=q.reading+'|'+q.masked;const set=alternatives.get(key)||new Set();set.add(q.char);alternatives.set(key,set);}
- for(const q of questions)q.requiresHint=q.requiresHint||(q.masked==='□')||alternatives.get(q.reading+'|'+q.masked).size>1;
- return questions;
+ return sentenceQuestions(data,grade,selectScope(data,grade,unitIds),multiple);
 }
 export function updateRecord(previous,outcome,now=Date.now()){
  const r={attempts:0,correct:0,helped:0,errors:0,streak:0,stage:0,due:now,history:[],...previous};

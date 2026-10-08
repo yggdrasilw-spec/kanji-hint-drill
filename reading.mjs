@@ -1,5 +1,5 @@
 export function normalizeReading(value){return String(value).normalize('NFKC').replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/[\s。、，,.！？!?]/g,'');}
-export function readingQuestions(questions,data){return questions.map(q=>({...q,id:q.id+'|read',mode:'read',requiresHint:false,acceptedReadings:[...new Set([q.reading,...(data?.glyphs[q.char]?.words||[]).filter(w=>w.word===q.word).map(w=>w.reading)])]}));}
+export function readingQuestions(questions,data){return questions.map(q=>({...q,id:q.id+'|read',mode:'read',requiresHint:false,acceptedReadings:q.acceptedReadings||[...new Set([q.reading,...(data?.glyphs[q.char]?.words||[]).filter(w=>w.word===q.word).map(w=>w.reading)])]}));}
 export function createReading({$,getCurrent,getState,setStrokes,setBusy,recognize,record,feedback,kana}){
  let inputMode='keyboard',recognition=null,request=0,composing=false,committing=false;
  const field=$('readingInput'),speech=globalThis.SpeechRecognition||globalThis.webkitSpeechRecognition;
