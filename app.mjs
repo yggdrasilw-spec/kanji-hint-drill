@@ -57,6 +57,9 @@ function referenceStrokes(){return data.glyphs[current.char].paths.map(d=>{const
 function begin(){
  refreshScope();if(!questions.length)return;queue=buildQueue(questions,store.records,+settings.length);queueLimit=queue.length+4;queueIndex=0;results=[];show('drillView');loadQuestion();
 }
+function setCopy(id,parts){
+ const el=$(id);el.replaceChildren();for(const [i,text] of parts.entries()){if(i)el.append(document.createElement('wbr'));const phrase=document.createElement('span');phrase.className='copy-chunk';phrase.textContent=text;el.append(phrase);}
+}
 function renderSentence(q,isRead){
  const sentence=$('masked');sentence.replaceChildren();sentence.classList.add('sentence');sentence.dataset.questionId=q.id;
  const target=document.createElement(isRead?'span':'ruby');target.id='sentenceTarget';target.className='sentence-target';
@@ -67,10 +70,10 @@ function renderSentence(q,isRead){
 function loadQuestion(){
  reader?.stop();token++;if(queueIndex>=queue.length){renderResults();return;}
  current=queue[queueIndex];strokes=[];drawing=null;hints=current.requiresHint?1:0;answerSeen=false;judged=false;busy=false;
- const isRead=current.mode==='read';$('readingControls').hidden=!isRead;$('writingBox').hidden=false;$('kanaTools').hidden=true;$('questionInstruction').textContent=isRead?'ぶんを よんで、いろの ついた ことばを よもう':'ぶんを よんで、□の かんじを かこう';$('reading').hidden=true;
- $('reading').textContent=current.reading;renderSentence(current,isRead);$('cue').textContent='よみがなと ぶんを ヒントに、□の かんじを かいてね。';
+ const isRead=current.mode==='read';$('readingControls').hidden=!isRead;$('writingBox').hidden=false;$('kanaTools').hidden=true;setCopy('questionInstruction',isRead?['ぶんを よんで、','いろの ついた',' ことばを よもう']:['ぶんを よんで、','□の かんじを',' かこう']);$('reading').hidden=true;
+ $('reading').textContent=current.reading;renderSentence(current,isRead);setCopy('cue',['よみがなと ぶんを',' ヒントに、','□の かんじを',' かいてね。']);
  $('position').textContent=`${queueIndex+1} / ${queue.length}問`;$('sessionBadge').textContent=store.records[current.id]?.errors?'復習':'練習';$('progressFill').style.width=(queueIndex/queue.length*100)+'%';
- $('feedback').textContent='';$('feedback').className='feedback';$('next').hidden=true;$('confirmation').hidden=true;$('answer').disabled=false;$('clear').disabled=false;$('undo').disabled=false;$('check').textContent='できた！ たしかめる 🌸';if(isRead){$('cue').textContent='いろの ついた ぶぶんの よみを、こたえてね。';reader.unlock();reader.reset();}renderGuide();redraw();
+ $('feedback').textContent='';$('feedback').className='feedback';$('next').hidden=true;$('confirmation').hidden=true;$('answer').disabled=false;$('clear').disabled=false;$('undo').disabled=false;$('check').textContent='できた！ たしかめる 🌸';if(isRead){setCopy('cue',['いろの ついた ぶぶんの',' よみを、','こたえてね。']);reader.unlock();reader.reset();}renderGuide();redraw();
 }
 async function recognize(kind='kanji'){
  if(!modelReady)throw Error('Model unavailable');
