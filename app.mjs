@@ -150,7 +150,10 @@ function renderShapeFocus(){
   const points=strokes[number-1];if(!points?.length)continue;
   const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',points.map((p,i)=>(i?'L':'M')+p.x+','+p.y).join(' '));overlay.append(path);
  }
- const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('cx',shapeFocus.point.x);circle.setAttribute('cy',shapeFocus.point.y);circle.setAttribute('r','8');circle.classList.add('focus-circle');overlay.append(circle);
+ const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('cx',shapeFocus.point.x);circle.setAttribute('cy',shapeFocus.point.y);circle.setAttribute('r',shapeFocus.radius);circle.classList.add('focus-circle');overlay.append(circle);
+ for(const point of [shapeFocus.tip,shapeFocus.acrossPoint]){
+  const anchor=document.createElementNS('http://www.w3.org/2000/svg','circle');anchor.setAttribute('cx',point.x);anchor.setAttribute('cy',point.y);anchor.setAttribute('r','1.3');anchor.classList.add('focus-anchor');overlay.append(anchor);
+ }
 }
 async function check(){if(reader?.active()){reader.judge();return;}
  if(!strokes.length||judged||busy)return;
@@ -163,7 +166,7 @@ async function check(){if(reader?.active()){reader.judge();return;}
   const shape=checkCharacterShape(current.char,strokes,reference,settings.shapeChecks);
   if(recognized===current.char){
    if(shape.status==='fail'){
-    shapeFocus=shape.focus;feedback('もう少し！ 線の形を なおそう。\n'+shape.text+'\n色のついた線と、丸のところを 見てね。');
+    shapeFocus=shape.focus;feedback('もう少し！ 線の形を なおそう。\n'+shape.text+'\n丸の中で、線の先と 横線の位置を 比べよう。');
     record({type:'wrong',hints,answerSeen,reason:'protrusion',recognized});return;
    }
    if(shape.status==='uncertain'){

@@ -29,7 +29,7 @@ let browser;
    transformed:status(transform(ref,.52,.15,21,3)),transformedWrong:status(transform(wrong,.52,-.12,21,3)),shuffled:status(shuffled),missing:status(ref.slice(1)),malformed:status(malformed),nan:status(nan),
    off:status(wrong,{protrusion:'off'}),other:checkCharacterShape('金',ref,ref).status,
    normalized:normalizeShapeSettings({protrusion:'bad',shape:'off',count:7}),touch:status(cut(0)),
-   shortResult:checkCharacterShape('鉄',short,ref),wrongResult:checkCharacterShape('鉄',wrong,ref)
+   shortResult:checkCharacterShape('鉄',short,ref),wrongResult:checkCharacterShape('鉄',wrong,ref),farResult:checkCharacterShape('鉄',cut(-.45),ref),reversedResult:checkCharacterShape('鉄',cut(-.45).map(s=>[...s].reverse()),ref)
   };
  },data.glyphs['鉄'].paths);
  console.log('GEOMETRY',JSON.stringify(geometry));
@@ -37,6 +37,11 @@ let browser;
  for(const k of ['wrong','normal','strict','transformedWrong','touch'])assert.equal(geometry[k],'fail',k);
  for(const k of ['boundary','missing','malformed','nan'])assert.equal(geometry[k],'uncertain',k);
  assert.equal(geometry.off,'skipped');assert.equal(geometry.other,'skipped');assert.equal(geometry.normalized.protrusion,'normal');assert.equal(geometry.normalized.shape,'off');
+ for(const result of [geometry.shortResult,geometry.wrongResult,geometry.farResult,geometry.reversedResult]){
+  assert.equal(result.status,'fail');const focus=result.focus;
+  for(const point of [focus.tip,focus.acrossPoint])assert.ok(Math.hypot(point.x-focus.point.x,point.y-focus.point.y)+2<focus.radius);
+ }
+ assert.ok(geometry.farResult.focus.radius>geometry.wrongResult.focus.radius);
  const {questionsFor}=await import('../core.mjs');
  const unit=data.grades.find(g=>g.grade===3).units.find(u=>u.newCharacters.some(c=>c.text==='鉄'));
  const q=questionsFor(data,3,[unit.id],false).find(q=>q.char==='鉄');assert.ok(q);
@@ -70,6 +75,11 @@ let browser;
  async function judge(){await page.click('#check');await page.waitForFunction(()=>!document.getElementById('next').hidden||!document.getElementById('confirmation').hidden,{timeout:60000});return page.locator('#feedback').innerText();}
  await start();await draw('wrong');const wrongFeedback=await judge();console.log('WRONG',wrongFeedback);assert.doesNotMatch(wrongFeedback,/正解！/);assert.match(wrongFeedback,/上まで/);
  let records=await page.evaluate(()=>JSON.parse(localStorage.getItem('kanji-hint-drill-v1')).records);assert.equal(records[q.id].correct,0);assert.equal(records[q.id].history.at(-1).reason,'protrusion');assert.equal(records[q.id].history.at(-1).type,'wrong');assert.equal(await page.locator('#shapeFocus path').count(),2);
+ const marker=await page.evaluate(()=>{
+  const circle=document.querySelector('#shapeFocus .focus-circle'),anchors=[...document.querySelectorAll('#shapeFocus .focus-anchor')];
+  const x=Number(circle.getAttribute('cx')),y=Number(circle.getAttribute('cy')),radius=Number(circle.getAttribute('r'));
+  return {radius,anchors:anchors.length,contains:anchors.every(p=>Math.hypot(Number(p.getAttribute('cx'))-x,Number(p.getAttribute('cy'))-y)+2<radius)};
+ });assert.equal(marker.anchors,2);assert.ok(marker.contains);assert.notEqual(marker.radius,8);
  await page.screenshot({path:path.join(out,'shape-iron-wrong.png'),fullPage:true});
  await page.click('#back');await start();assert.equal(await page.locator('#shapeFocus path').count(),0);await draw('correct');assert.match(await judge(),/正解！/);
  records=await page.evaluate(()=>JSON.parse(localStorage.getItem('kanji-hint-drill-v1')).records);assert.equal(records[q.id].correct,1);assert.match(records[q.id].history.at(-1).shapePolicy,/protrusion=normal/);

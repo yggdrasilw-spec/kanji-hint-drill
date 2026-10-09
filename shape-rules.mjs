@@ -43,6 +43,21 @@ function assignment(cost){
 }
 const cross=(a,b)=>a.x*b.y-a.y*b.x;
 const sub=(a,b)=>({x:a.x-b.x,y:a.y-b.y});
+export function protrusionFocus(tip,horizontal,stroke,across){
+ // Compare the oriented upper endpoint with the nearest point on the actual
+ // drawn horizontal, including curved and slanted horizontals.
+ let acrossPoint=horizontal[0],distance=Infinity;
+ for(let i=1;i<horizontal.length;i++){
+  const a=horizontal[i-1],b=horizontal[i],dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy;
+  const t=len2?Math.max(0,Math.min(1,((tip.x-a.x)*dx+(tip.y-a.y)*dy)/len2)):0;
+  const p={x:a.x+t*dx,y:a.y+t*dy},d=Math.hypot(tip.x-p.x,tip.y-p.y);
+  if(d<distance){distance=d;acrossPoint=p;}
+ }
+ const length=Math.hypot(horizontal.at(-1).x-horizontal[0].x,horizontal.at(-1).y-horizontal[0].y);
+ const padding=Math.max(3,length*.1),point={x:(tip.x+acrossPoint.x)/2,y:(tip.y+acrossPoint.y)/2};
+ // Never cap the radius: doing so could put the endpoint outside the circle.
+ return {point,radius:Math.max(5,length*.18,Math.hypot(tip.x-acrossPoint.x,tip.y-acrossPoint.y)/2+padding),tip:{...tip},acrossPoint,stroke,across};
+}
 function crossings(a,b){
  const out=[];
  for(let i=1;i<a.length;i++)for(let j=1;j<b.length;j++){
@@ -85,7 +100,7 @@ export function checkCharacterShape(char,strokes,expected,settings){
   const status=extension>=minimum+band&&intersects?'pass':extension<minimum-band?'fail':'uncertain';
   checks.push({id:rule.id,status,kind:rule.kind,stroke:a.index+1,across:b.index+1,extension,minimum,
    text:status==='uncertain'?'上の横線より 上に出る長さを、お手本と 比べて 確認しよう。':rule.text,
-   focus:{point:hits[0]||b.points[Math.floor(b.points.length/2)],stroke:a.index+1,across:b.index+1}});
+   focus:protrusionFocus(start,b.points,a.index+1,b.index+1)});
  }
  const status=checks.some(c=>c.status==='fail')?'fail':checks.some(c=>c.status==='uncertain')?'uncertain':'pass';
  const issue=checks.find(c=>c.status===status);

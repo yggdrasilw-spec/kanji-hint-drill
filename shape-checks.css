@@ -9,4 +9,5 @@
 #shapeFocus{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;fill:none;stroke:#b04e25;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #shapeFocus path{stroke-dasharray:3 2}
 #shapeFocus .focus-circle{stroke-width:1.2;fill:#fff0d833}
+#shapeFocus .focus-anchor{stroke-width:.6;fill:#b04e25}
 @media(max-width:650px){.shape-setting-grid{grid-template-columns:1fr}.shape-settings{padding:18px}}
