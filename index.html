@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ひとふでヒント — かく・よむ 漢字あそび</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="child-ui.css"><link rel="stylesheet" href="shape-checks.css"><script src="assets/ort.wasm.min.js" defer></script><script type="module" src="app.mjs"></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ひとふでヒント — かく・よむ 漢字あそび</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="child-ui.css"><link rel="stylesheet" href="shape-checks.css"><link rel="stylesheet" href="character-cards.css"><script src="assets/ort.wasm.min.js" defer></script><script type="module" src="app.mjs"></script></head>
 <body class="vertical-ui">
 <header><a class="brand" href="./"><span class="brand-icon">✎</span><span>ひとふでヒント<small>ひとふでから、できた！へ。</small></span></a><nav aria-label="画面を選ぶ"><button id="setupTab" class="tab active">あそぶ</button><button id="progressTab" class="tab">きろく</button></nav></header>
 <main>
@@ -22,10 +22,18 @@
   <button id="resetShapeSettings" type="button" class="text-button">おすすめの設定にもどす</button>
  </details>
  <div class="setup-grid"><div class="card unit-panel">
-  <h2 class="step-title"><span class="step">２</span><span class="step-caption"><span class="copy-chunk">がくねんと</span><wbr><span class="copy-chunk"> ことばを</span><wbr><span class="copy-chunk"> えらぼう</span></span></h2><div class="panel-top"><label class="grade-label" for="grade">学年 <select id="grade"><option value="1">1年生</option><option value="2">2年生</option><option value="3">3年生</option><option value="4">4年生</option><option value="5">5年生</option><option value="6">6年生</option></select></label><div class="selection-actions"><button id="selectAll" class="text-button">全部えらぶ</button><button id="selectNone" class="text-button">チェックを外す</button></div></div>
+  <h2 class="step-title"><span class="step">２</span><span class="step-caption"><span class="copy-chunk">れんしゅうする</span><wbr><span class="copy-chunk"> かんじを</span><wbr><span class="copy-chunk"> えらぼう</span></span></h2>
+  <div class="scope-mode-picker" role="group" aria-label="かんじのえらび方"><button type="button" data-scope-mode="characters" aria-pressed="true">かんじを えらぶ</button><button type="button" data-scope-mode="units" aria-pressed="false">単元から えらぶ</button></div>
+  <div id="characterPicker">
+   <p class="character-help"><span class="copy-chunk">カードを タップすると</span><wbr><span class="copy-chunk"> ひかるよ。</span><wbr><span class="copy-chunk">ひかった かんじだけ</span><wbr><span class="copy-chunk"> れんしゅうしよう。</span></p>
+   <div class="character-filters"><label for="characterGradeFilter">学年をみる<select id="characterGradeFilter"><option value="">1〜6年生 ぜんぶ</option><option value="1">1年生</option><option value="2">2年生</option><option value="3">3年生</option><option value="4">4年生</option><option value="5">5年生</option><option value="6">6年生</option></select></label><label for="characterSearch">かんじをさがす<input id="characterSearch" type="search" placeholder="例：鉄" autocomplete="off" maxlength="30"></label></div>
+   <div class="character-selection-actions"><button id="characterSelectAll" type="button" class="text-button">1〜6年生を全部えらぶ</button><button id="characterSelectNone" type="button" class="text-button">ぜんぶ外す</button></div>
+   <div id="characterGroups" class="character-groups" aria-label="学年別の漢字カード"></div><p id="characterSearchEmpty" class="character-empty" role="status" hidden>かんじが みつかりません。さがす字や 学年を かえてね。</p>
+  </div>
+  <div id="unitPicker" hidden><div class="panel-top"><label class="grade-label" for="grade">学年 <select id="grade"><option value="1">1年生</option><option value="2">2年生</option><option value="3">3年生</option><option value="4">4年生</option><option value="5">5年生</option><option value="6">6年生</option></select></label><div class="selection-actions"><button id="selectAll" class="text-button">全部えらぶ</button><button id="selectNone" class="text-button">チェックを外す</button></div></div>
   <p class="unit-help"><span class="copy-chunk">れんしゅうしたい ところを</span><wbr><span class="copy-chunk"> おしてね。</span><wbr><span class="copy-chunk">「ここまで」で</span><wbr><span class="copy-chunk"> まとめて えらべるよ。</span></p>
-  <div id="units" aria-label="単元の一覧"><p>漢字のデータを読み込んでいます…</p></div>
- </div><aside class="card summary-panel"><h2 class="step-title"><span class="step">３</span> <span class="copy-chunk">さあ、</span><wbr><span class="copy-chunk">はじめよう！</span></h2><div class="big-count"><strong id="scopeCount">0</strong><span>字</span></div><p id="selectionSummary">単元をえらんでね。</p><div id="scopePreview" class="char-preview"></div>
+  <div id="units" aria-label="単元の一覧"><p>漢字のデータを読み込んでいます…</p></div></div>
+ </div><aside class="card summary-panel"><h2 class="step-title"><span class="step">３</span> <span class="copy-chunk">さあ、</span><wbr><span class="copy-chunk">はじめよう！</span></h2><div class="big-count"><strong id="scopeCount">0</strong><span>字</span></div><p id="selectionSummary" role="status" aria-live="polite">かんじを えらんでね。</p><div id="scopePreview" class="char-preview" aria-label="えらんだ漢字"></div>
   <label class="option"><input type="checkbox" id="multiple" checked><span>いろいろな読み方で出す<small><span class="copy-chunk">いろいろな文で、</span><wbr><span class="copy-chunk">同じ字も練習します。</span></small></span></label>
   <label class="length-label" for="sessionLength">1回の問題数 <select id="sessionLength"><option value="5">5問</option><option value="10" selected>10問</option><option value="20">20問</option></select></label>
   <button id="start" class="primary wide" disabled>あそびに いこう！ <span>→</span></button><p id="modelStatus" class="status" role="status">手書きの判定を準備しています…</p>

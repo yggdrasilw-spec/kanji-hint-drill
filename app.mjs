@@ -1,13 +1,14 @@
-import {STORAGE_KEY,selectScope,questionsFor,updateRecord,buildQueue,summaryFor,analyzeStrokes,validateProgress} from './core.mjs';
+import {STORAGE_KEY,selectScope,questionsFor,gradeCharacters,selectedCharacters,questionsForCharacters,updateRecord,buildQueue,summaryFor,analyzeStrokes,validateProgress} from './core.mjs';
 import {createReading,readingQuestions} from './reading.mjs';
 import {normalizeShapeSettings,checkCharacterShape} from './shape-rules.mjs';
 const $=id=>document.getElementById(id);
 let kana,reader;
 let data,session,labels,modelError='',modelReady=false,questions=[],queue=[],queueIndex=0,queueLimit=0,results=[],strokes=[],drawing=null,current=null,answerSeen=false,hints=0,judged=false,busy=false,token=0;
-let store={version:1,records:{}},settings={grade:1,selections:{},multiple:true,length:10,mode:'write',vertical:true},storageAvailable=true;
+let store={version:1,records:{}},settings={grade:1,selections:{},multiple:true,length:10,mode:'write',vertical:true,scopeMode:'characters',characters:[]},storageAvailable=true;
 try{const raw=localStorage.getItem(STORAGE_KEY);if(raw)store=validateProgress(JSON.parse(raw));const saved=JSON.parse(localStorage.getItem(STORAGE_KEY+'-settings')||'null');if(saved&&[1,2,3,4,5,6].includes(+saved.grade)){settings={...settings,...saved};settings.selections=saved.selections&&typeof saved.selections==='object'?saved.selections:{};}}
 catch(e){storageAvailable=false;$('storageMessage').textContent='保存した記録を読み込めませんでした。練習はできますが、記録の保存状態を確認してください。';}
 settings.shapeChecks=normalizeShapeSettings(settings.shapeChecks);
+if(!['characters','units'].includes(settings.scopeMode))settings.scopeMode='characters';
 for(const control of document.querySelectorAll('[data-shape-setting]')){
  const key=control.dataset.shapeSetting;control.value=settings.shapeChecks[key];
  control.addEventListener('change',()=>{settings.shapeChecks=normalizeShapeSettings({...settings.shapeChecks,[key]:control.value});persist();});
@@ -18,6 +19,44 @@ function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));l
 function show(view){reader?.stop();for(const id of ['setupView','drillView','recordView','resultView'])$(id).hidden=id!==view;$('setupTab').classList.toggle('active',view==='setupView');$('progressTab').classList.toggle('active',view==='recordView');window.scrollTo({top:0,behavior:'smooth'});}
 function units(){return data.grades.find(g=>g.grade===+settings.grade).units;}
 function selected(){return settings.selections[settings.grade]||[];}
+function renderCharacterCards(){
+ const container=$('characterGroups');container.replaceChildren();
+ const picked=new Set(settings.characters);
+ for(const grade of data.grades.map(g=>g.grade)){
+  const chars=gradeCharacters(data,grade),section=document.createElement('section');section.className='character-grade';section.dataset.grade=grade;
+  const heading=document.createElement('h3');heading.id='character-grade-'+grade;heading.textContent=grade+'年生';
+  const count=document.createElement('small');count.textContent=chars.length+'字';heading.append(count);section.setAttribute('aria-labelledby',heading.id);
+  const actions=document.createElement('div');actions.className='character-grade-actions';
+  for(const [label,add] of [['この学年を全部えらぶ',true],['この学年を外す',false]]){
+   const button=document.createElement('button');button.type='button';button.className='text-button';button.textContent=label;button.setAttribute('aria-label',grade+'年生：'+label);
+   button.onclick=()=>{const selected=new Set(settings.characters);for(const char of chars)if(add)selected.add(char);else selected.delete(char);settings.characters=[...selected];persist();syncCharacterCards();refreshScope();};actions.append(button);
+  }
+  const top=document.createElement('div');top.className='character-grade-top';top.append(heading,actions);section.append(top);
+  const grid=document.createElement('div');grid.className='character-grid';
+  for(const char of chars){
+   const button=document.createElement('button');button.type='button';button.className='character-card';button.dataset.char=char;button.textContent=char;
+   button.setAttribute('aria-label',char+'（'+grade+'年生）');button.setAttribute('aria-pressed',String(picked.has(char)));button.classList.toggle('selected',picked.has(char));
+   button.onclick=()=>{const selected=new Set(settings.characters);if(selected.has(char))selected.delete(char);else selected.add(char);settings.characters=[...selected];persist();syncCharacterCards();refreshScope();};grid.append(button);
+  }
+  section.append(grid);container.append(section);
+ }
+ filterCharacterCards();
+}
+function syncCharacterCards(){
+ const picked=new Set(settings.characters);for(const button of $('characterGroups').querySelectorAll('.character-card')){const selected=picked.has(button.dataset.char);button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));}
+}
+function filterCharacterCards(){
+ const query=$('characterSearch').value.trim(),grade=$('characterGradeFilter').value;
+ let visible=0;for(const section of $('characterGroups').children){
+  let count=0;for(const button of section.querySelectorAll('.character-card')){button.hidden=!!query&&!query.includes(button.dataset.char);if(!button.hidden)count++;}
+  section.hidden=!!grade&&section.dataset.grade!==grade||!count;if(!section.hidden)visible+=count;
+ }
+ $('characterSearchEmpty').hidden=visible>0;
+}
+function renderScopeMode(){
+ const cards=settings.scopeMode==='characters';$('characterPicker').hidden=!cards;$('unitPicker').hidden=cards;
+ for(const button of document.querySelectorAll('[data-scope-mode]'))button.setAttribute('aria-pressed',String(button.dataset.scopeMode===settings.scopeMode));
+}
 function renderUnits(){
  $('units').replaceChildren();let volume;
  for(const [i,u] of units().entries()){
@@ -29,8 +68,8 @@ function renderUnits(){
  }
 }
 function refreshScope(){
- const chars=selectScope(data,settings.grade,selected());questions=questionsFor(data,settings.grade,selected(),settings.multiple);if(settings.mode==='read')questions=readingQuestions(questions,data);
- $('scopeCount').textContent=chars.length;$('selectionSummary').textContent=selected().length?`${selected().length}単元 · ${questions.length}通りの問題`:'単元をえらんでね。';$('scopePreview').replaceChildren();
+ const cards=settings.scopeMode==='characters',chars=cards?settings.characters:selectScope(data,settings.grade,selected());questions=cards?questionsForCharacters(data,chars,settings.multiple):questionsFor(data,settings.grade,selected(),settings.multiple);if(settings.mode==='read')questions=readingQuestions(questions,data);
+ $('scopeCount').textContent=chars.length;$('selectionSummary').textContent=cards?(chars.length?`${chars.length}字を選択 · ${questions.length}通りの問題`:'れんしゅうしたい かんじを タップしてね。'):selected().length?`${selected().length}単元 · ${questions.length}通りの問題`:'単元をえらんでね。';$('scopePreview').replaceChildren();
  chars.forEach(c=>{const s=document.createElement('span');s.textContent=c;$('scopePreview').append(s);});$('start').disabled=!questions.length;$('quickStart').disabled=!questions.length;
 }
 async function loadModel(){
@@ -158,6 +197,10 @@ function renderRecords(){
 }
 $('grade').addEventListener('change',()=>{settings.grade=+$('grade').value;if(!Array.isArray(settings.selections[settings.grade]))settings.selections[settings.grade]=[units()[0].id];persist();renderUnits();refreshScope();});
 $('multiple').addEventListener('change',()=>{settings.multiple=$('multiple').checked;persist();refreshScope();});$('sessionLength').addEventListener('change',()=>{settings.length=+$('sessionLength').value;persist();});
+for(const button of document.querySelectorAll('[data-scope-mode]'))button.onclick=()=>{settings.scopeMode=button.dataset.scopeMode;persist();renderScopeMode();refreshScope();};
+$('characterSearch').addEventListener('input',filterCharacterCards);$('characterGradeFilter').addEventListener('change',filterCharacterCards);
+$('characterSelectAll').onclick=()=>{settings.characters=Object.keys(data.glyphs);persist();syncCharacterCards();refreshScope();};
+$('characterSelectNone').onclick=()=>{settings.characters=[];persist();syncCharacterCards();refreshScope();};
 $('selectAll').onclick=()=>{settings.selections[settings.grade]=units().map(u=>u.id);persist();renderUnits();refreshScope();};$('selectNone').onclick=()=>{settings.selections[settings.grade]=[];persist();renderUnits();refreshScope();};$('start').onclick=$('quickStart').onclick=begin;
 $('setupTab').onclick=$('back').onclick=$('finish').onclick=()=>{token++;busy=false;show('setupView');refreshScope();};$('progressTab').onclick=()=>{token++;busy=false;renderRecords();show('recordView');};$('restart').onclick=begin;
 $('undo').onclick=()=>{if(judged||busy)return;strokes.pop();redraw();};$('clear').onclick=()=>{if(judged||busy)return;strokes=[];drawing=null;redraw();};
@@ -177,5 +220,5 @@ try{
  for(const radio of document.querySelectorAll('input[name="mode"]')){radio.checked=radio.value===settings.mode;radio.onchange=()=>{settings.mode=radio.value;persist();refreshScope();};}
  $('grade').value=settings.grade;$('multiple').checked=settings.multiple;$('sessionLength').value=[5,10,20].includes(+settings.length)?settings.length:10;
  for(const g of data.grades)if(!Array.isArray(settings.selections[g.grade]))settings.selections[g.grade]=[g.units[0].id];
- renderUnits();refreshScope();await loadModel();
+ settings.characters=selectedCharacters(data,settings.characters);renderCharacterCards();renderScopeMode();renderUnits();refreshScope();await loadModel();
 }catch(e){$('fatal').hidden=false;$('fatal').textContent='漢字のデータを読み込めません。HTTPでアプリを開き直してください。';console.error(e);}

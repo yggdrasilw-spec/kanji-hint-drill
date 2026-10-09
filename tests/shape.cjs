@@ -41,7 +41,7 @@ let browser;
  const unit=data.grades.find(g=>g.grade===3).units.find(u=>u.newCharacters.some(c=>c.text==='鉄'));
  const q=questionsFor(data,3,[unit.id],false).find(q=>q.char==='鉄');assert.ok(q);
  const seed={version:1,records:{[q.id]:{attempts:0,correct:0,helped:0,errors:1,stage:0,streak:0,due:0,history:[]}}};
- await page.evaluate(({seed,unit})=>{localStorage.setItem('kanji-hint-drill-v1',JSON.stringify(seed));localStorage.setItem('kanji-hint-drill-v1-settings',JSON.stringify({grade:3,selections:{3:[unit]},multiple:false,length:5,mode:'write',vertical:true}));},{seed,unit:unit.id});
+ await page.evaluate(({seed,unit})=>{localStorage.setItem('kanji-hint-drill-v1',JSON.stringify(seed));localStorage.setItem('kanji-hint-drill-v1-settings',JSON.stringify({grade:3,selections:{3:[unit]},multiple:false,length:5,mode:'write',vertical:true,scopeMode:'units'}));},{seed,unit:unit.id});
  await page.reload();await page.waitForFunction(()=>document.getElementById('modelStatus').textContent.includes('使えます'),{timeout:120000});
  await page.locator('.shape-settings summary').click();await page.selectOption('#shapeProtrusion','strict');await page.selectOption('#shapePosition','off');await page.reload();
  assert.equal(await page.locator('#shapeProtrusion').inputValue(),'strict');assert.equal(await page.locator('#shapePosition').inputValue(),'off');

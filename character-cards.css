@@ -1,0 +1,22 @@
+.scope-mode-picker{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.scope-mode-picker button{flex:1;min-width:160px;font-size:16px;line-height:1.5;background:#fff;border-color:#e1d4ef}
+.scope-mode-picker button[aria-pressed="true"]{background:#eee5ff;border-color:#9676c6;color:#543884}
+.character-help{font-size:14px;color:var(--muted);line-height:1.8}
+.character-filters{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}
+.character-filters label{display:flex;flex-direction:column;gap:7px;font-size:14px;font-weight:700;min-width:0}
+.character-filters select,.character-filters input{width:100%;min-width:0;font:inherit;background:#fff;border:2px solid var(--line);border-radius:14px;min-height:52px;padding:10px 12px;color:var(--ink)}
+.character-selection-actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.character-selection-actions button,.character-grade-actions button{min-height:44px;font-size:13px;padding:8px}
+.character-groups{max-height:660px;overflow:auto;overscroll-behavior:contain;padding:4px 10px 14px;margin:10px -10px 0;scrollbar-gutter:stable}
+.character-grade+.character-grade{margin-top:26px}
+.character-grade-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.character-grade h3{margin:0;font-size:19px;color:#58408b}
+.character-grade h3 small{font-size:13px;font-weight:400;color:var(--muted);margin-left:10px}
+.character-grade-actions{display:flex;gap:6px;flex-wrap:wrap}
+.character-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(57px,1fr));gap:10px}
+button.character-card{position:relative;aspect-ratio:1;min-height:57px;padding:4px;font-family:'Noto Sans JP',sans-serif;font-size:29px;font-weight:500;border:2px solid #ded4ea;border-radius:15px;background:#fffdfb;box-shadow:0 3px 0 #e6deeb;color:#51445f;transition:background .15s,border-color .15s,box-shadow .15s}
+button.character-card.selected{background:#fff0a9;border-color:#d99c35;color:#5a3920;box-shadow:0 0 0 2px #ffe3a0,0 0 12px #e6b64b70,0 3px 0 #e4bc64;font-weight:700}
+button.character-card.selected::after{content:'✓';position:absolute;top:0;right:4px;color:#8b591b;font-size:12px;line-height:1.4}
+button.character-card:focus-visible{outline:3px solid #7151b4;outline-offset:3px}
+.character-empty{padding:18px;background:#fff0db;border-radius:14px;font-size:14px}
+@media(max-width:720px){.character-groups{max-height:520px}.character-filters{grid-template-columns:1fr}.character-grid{grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:9px}.scope-mode-picker button{min-width:130px;font-size:14px;padding:10px}.character-grade-actions button{font-size:12px}button.character-card{min-height:54px;font-size:27px}}

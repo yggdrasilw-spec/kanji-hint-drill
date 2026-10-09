@@ -8,6 +8,18 @@ export function selectScope(data,grade,unitIds){
 export function questionsFor(data,grade,unitIds,multiple=true){
  return sentenceQuestions(data,grade,selectScope(data,grade,unitIds),multiple);
 }
+export function gradeCharacters(data,grade){
+ return Object.keys(data.glyphs).filter(char=>data.glyphs[char].grade===Number(grade)).sort((a,b)=>a.codePointAt(0)-b.codePointAt(0));
+}
+export function selectedCharacters(data,value){
+ return [...new Set(Array.isArray(value)?value:[])].filter(char=>typeof char==='string'&&Object.hasOwn(data.glyphs,char));
+}
+export function questionsForCharacters(data,chars,multiple=true){
+ const selected=selectedCharacters(data,chars);
+ // Build each target at its own grade; selecting a higher-grade card must not
+ // reveal unfamiliar surrounding kanji in a lower-grade question.
+ return [...new Set(selected.map(char=>data.glyphs[char].grade))].flatMap(grade=>sentenceQuestions(data,grade,selected.filter(char=>data.glyphs[char].grade===grade),multiple));
+}
 export function updateRecord(previous,outcome,now=Date.now()){
  const r={attempts:0,correct:0,helped:0,errors:0,streak:0,stage:0,due:now,history:[],...previous};
  r.attempts++;r.lastSeen=now;r.lastOutcome=outcome.type;
