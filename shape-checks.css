@@ -1,0 +1,12 @@
+.shape-settings{margin:0 0 28px;font-size:15px;writing-mode:horizontal-tb}
+.shape-settings summary{cursor:pointer;font-weight:700;min-height:36px;line-height:1.7}
+.shape-settings p{font-size:14px;line-height:1.8}
+.shape-setting-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:20px 0}
+.shape-setting-grid label{display:flex;flex-direction:column;gap:7px;font-weight:700;min-width:0}
+.shape-setting-grid small{font-weight:400;font-size:13px;line-height:1.7;color:var(--muted)}
+.shape-setting-grid select{width:100%;min-width:0}
+.shape-setting-note{color:var(--muted)}
+#shapeFocus{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;fill:none;stroke:#b04e25;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#shapeFocus path{stroke-dasharray:3 2}
+#shapeFocus .focus-circle{stroke-width:1.2;fill:#fff0d833}
+@media(max-width:650px){.shape-setting-grid{grid-template-columns:1fr}.shape-settings{padding:18px}}

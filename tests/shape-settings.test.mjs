@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {analyzeStrokes,updateRecord,validateProgress} from '../core.mjs';
+import {normalizeShapeSettings} from '../shape-rules.mjs';
+const h=[{x:20,y:50},{x:90,y:50}],v=[{x:50,y:20},{x:50,y:90}];
+assert.equal(analyzeStrokes([[...h].reverse()],[h],{direction:'off'}).type,'good');
+assert.equal(analyzeStrokes([v,h],[h,v],{order:'off'}).type,'good');
+assert.equal(analyzeStrokes([h],[h,v],{count:'off'}).type,'good');
+const shifted=h.map(p=>({x:p.x,y:p.y+24}));
+assert.equal(analyzeStrokes([shifted],[h],{shape:'relaxed'}).type,'good');
+assert.equal(analyzeStrokes([shifted],[h],{shape:'normal'}).type,'shape');
+assert.equal(analyzeStrokes([shifted],[h],{shape:'off'}).type,'good');
+assert.equal(normalizeShapeSettings({count:'strict'}).count,'normal');
+const r=updateRecord(null,{type:'wrong',reason:'protrusion',shapePolicy:'v1;protrusion=strict'},100);
+assert.equal(r.correct,0);assert.equal(r.errors,1);assert.equal(r.due,100);
+assert.equal(validateProgress({version:1,records:{iron:r}}).records.iron.history[0].shapePolicy,'v1;protrusion=strict');
+const old=validateProgress({version:1,records:{iron:{history:[{type:'correct',time:100}]}}});
+assert.equal(old.records.iron.history[0].shapePolicy,'');
+console.log('PASS: independently disabled direction/order/count/position, position tolerance, settings defaults, protrusion records and old-record migration');

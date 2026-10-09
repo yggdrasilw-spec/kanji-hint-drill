@@ -1,11 +1,18 @@
 import {STORAGE_KEY,selectScope,questionsFor,updateRecord,buildQueue,summaryFor,analyzeStrokes,validateProgress} from './core.mjs';
 import {createReading,readingQuestions} from './reading.mjs';
+import {normalizeShapeSettings,checkCharacterShape} from './shape-rules.mjs';
 const $=id=>document.getElementById(id);
 let kana,reader;
 let data,session,labels,modelError='',modelReady=false,questions=[],queue=[],queueIndex=0,queueLimit=0,results=[],strokes=[],drawing=null,current=null,answerSeen=false,hints=0,judged=false,busy=false,token=0;
 let store={version:1,records:{}},settings={grade:1,selections:{},multiple:true,length:10,mode:'write',vertical:true},storageAvailable=true;
 try{const raw=localStorage.getItem(STORAGE_KEY);if(raw)store=validateProgress(JSON.parse(raw));const saved=JSON.parse(localStorage.getItem(STORAGE_KEY+'-settings')||'null');if(saved&&[1,2,3,4,5,6].includes(+saved.grade)){settings={...settings,...saved};settings.selections=saved.selections&&typeof saved.selections==='object'?saved.selections:{};}}
 catch(e){storageAvailable=false;$('storageMessage').textContent='保存した記録を読み込めませんでした。練習はできますが、記録の保存状態を確認してください。';}
+settings.shapeChecks=normalizeShapeSettings(settings.shapeChecks);
+for(const control of document.querySelectorAll('[data-shape-setting]')){
+ const key=control.dataset.shapeSetting;control.value=settings.shapeChecks[key];
+ control.addEventListener('change',()=>{settings.shapeChecks=normalizeShapeSettings({...settings.shapeChecks,[key]:control.value});persist();});
+}
+$('resetShapeSettings').onclick=()=>{settings.shapeChecks=normalizeShapeSettings();for(const control of document.querySelectorAll('[data-shape-setting]'))control.value=settings.shapeChecks[control.dataset.shapeSetting];persist();};
 const canvas=$('canvas'),ctx=canvas.getContext('2d');
 function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localStorage.setItem(STORAGE_KEY+'-settings',JSON.stringify(settings));}catch(e){storageAvailable=false;$('storageMessage').textContent='記録を保存できません。学習後に「記録を書き出す」で保存してください。';}}
 function show(view){reader?.stop();for(const id of ['setupView','drillView','recordView','resultView'])$(id).hidden=id!==view;$('setupTab').classList.toggle('active',view==='setupView');$('progressTab').classList.toggle('active',view==='recordView');window.scrollTo({top:0,behavior:'smooth'});}
@@ -37,6 +44,7 @@ async function loadModel(){
 }
 async function fetchJSON(url){const r=await fetch(url);if(!r.ok)throw Error(`データを読み込めません (${r.status})`);return r.json();}
 function redraw(){
+ $('shapeFocus').replaceChildren();
  ctx.clearRect(0,0,480,480);ctx.lineWidth=11;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#263a32';ctx.fillStyle='#263a32';
  for(const s of [...strokes,...(drawing?[drawing]:[])]){if(!s.length)continue;ctx.beginPath();ctx.moveTo(s[0].x/109*480,s[0].y/109*480);for(const p of s.slice(1))ctx.lineTo(p.x/109*480,p.y/109*480);ctx.stroke();if(s.length===1){ctx.beginPath();ctx.arc(s[0].x/109*480,s[0].y/109*480,5.5,0,Math.PI*2);ctx.fill();}}
  $('strokeCount').textContent=strokes.length+'画';$('check').disabled=judged||busy||!strokes.length||!!drawing;if(reader?.active())reader.refresh();
@@ -69,7 +77,8 @@ function renderSentence(q,isRead){
 }
 function loadQuestion(){
  reader?.stop();token++;if(queueIndex>=queue.length){renderResults();return;}
- current=queue[queueIndex];strokes=[];drawing=null;hints=current.requiresHint?1:0;answerSeen=false;judged=false;busy=false;
+ current=queue[queueIndex];strokes=[];drawing=null;hints=current.requiresHint?1:0;answerSeen=false;judged=false;busy=false;shapeFocus=null;
+ $('shapeFocus').replaceChildren();
  const isRead=current.mode==='read';$('readingControls').hidden=!isRead;$('writingBox').hidden=false;$('kanaTools').hidden=true;setCopy('questionInstruction',isRead?['ぶんを よんで、','いろの ついた',' ことばを よもう']:['ぶんを よんで、','□の かんじを',' かこう']);$('reading').hidden=true;
  $('reading').textContent=current.reading;renderSentence(current,isRead);setCopy('cue',['よみがなと ぶんを',' ヒントに、','□の かんじを',' かいてね。']);
  $('position').textContent=`${queueIndex+1} / ${queue.length}問`;$('sessionBadge').textContent=store.records[current.id]?.errors?'復習':'練習';$('progressFill').style.width=(queueIndex/queue.length*100)+'%';
@@ -89,11 +98,21 @@ async function recognize(kind='kanji'){
 const homographs={'ニ':'二','エ':'工','カ':'力','タ':'夕'};
 function feedback(text,style='review'){$('feedback').textContent=text;$('feedback').className='feedback '+style;}
 function record(outcome){reader?.stop();
+ if(current.mode!=='read')outcome.shapePolicy='v1;'+Object.entries(settings.shapeChecks).map(([k,v])=>k+'='+v).join(';');
  if(judged)return;judged=true;store.records[current.id]=updateRecord(store.records[current.id],outcome);persist();results.push({q:current,outcome});
  if((outcome.type!=='correct'||outcome.hints>0||outcome.answerSeen||outcome.needsReview)&&queue.length<queueLimit){const at=Math.min(queue.length,queueIndex+4);if(!queue.slice(queueIndex+1).some(q=>q.id===current.id))queue.splice(at,0,current);}
  $('next').hidden=false;$('confirmation').hidden=true;$('check').disabled=true;$('clear').disabled=true;$('undo').disabled=true;$('answer').disabled=true;$('hint').disabled=true;if(reader?.active())reader.lock();
 }
 function offerConfirmation(text){feedback(text);answerSeen=true;renderGuide(true);$('confirmation').hidden=false;$('check').disabled=true;$('answer').disabled=true;}
+let shapeFocus=null;
+function renderShapeFocus(){
+ const overlay=$('shapeFocus');overlay.replaceChildren();if(!shapeFocus)return;
+ for(const number of [shapeFocus.across,shapeFocus.stroke]){
+  const points=strokes[number-1];if(!points?.length)continue;
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',points.map((p,i)=>(i?'L':'M')+p.x+','+p.y).join(' '));overlay.append(path);
+ }
+ const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('cx',shapeFocus.point.x);circle.setAttribute('cy',shapeFocus.point.y);circle.setAttribute('r','8');circle.classList.add('focus-circle');overlay.append(circle);
+}
 async function check(){if(reader?.active()){reader.judge();return;}
  if(!strokes.length||judged||busy)return;
  if(!modelReady){offerConfirmation('自動判定が使えないため、答えのお手本と比べて確認しよう。');return;}
@@ -101,8 +120,16 @@ async function check(){if(reader?.active()){reader.judge();return;}
  try{
   const predictions=await recognize();if(requestToken!==token)return;const best=predictions[0],recognized=homographs[best.char]||best.char;
   if(best.confidence<.55){offerConfirmation('字の判定がはっきりしませんでした。誤答としては記録しません。お手本と比べて確認しよう。');return;}
-  const analysis=analyzeStrokes(strokes,referenceStrokes());
+  const reference=referenceStrokes(),analysis=analyzeStrokes(strokes,reference,settings.shapeChecks);
+  const shape=checkCharacterShape(current.char,strokes,reference,settings.shapeChecks);
   if(recognized===current.char){
+   if(shape.status==='fail'){
+    shapeFocus=shape.focus;feedback('もう少し！ 線の形を なおそう。\n'+shape.text+'\n色のついた線と、丸のところを 見てね。');
+    record({type:'wrong',hints,answerSeen,reason:'protrusion',recognized});return;
+   }
+   if(shape.status==='uncertain'){
+    shapeFocus=shape.focus||null;offerConfirmation('「'+current.char+'」に見えました。\n'+shape.text);return;
+   }
    feedback(`正解！${hints||answerSeen?' ヒントを使って思い出せたね。':' 自分の力で書けたね。'}\n${analysis.text}`,analysis.type==='good'?'good':'review');
    // Correct character with a stroke problem needs review; it is not counted as fluent mastery.
    const outcome={type:'correct',hints,answerSeen,reason:analysis.type==='good'?'':analysis.type,recognized,needsReview:analysis.type!=='good'};
@@ -113,13 +140,13 @@ async function check(){if(reader?.active()){reader.judge();return;}
    feedback(`「${recognized}」に見えました。\n答えは「${current.char}」。${analysis.type==='good'?'字の形の違いを比べてみよう。':analysis.text}`);answerSeen=true;renderGuide(true);record({type:'wrong',hints,answerSeen:true,reason:recognized!==current.char?'different-character':analysis.type,recognized});
   }
  }catch(e){if(requestToken!==token)return;offerConfirmation('自動判定が止まりました。今回は、お手本と比べて確認しよう。');console.warn(e);}
- finally{if(requestToken===token){busy=false;$('check').textContent='できた！ たしかめる 🌸';redraw();if(!$('confirmation').hidden)$('check').disabled=true;}}
+ finally{if(requestToken===token){busy=false;$('check').textContent='できた！ たしかめる 🌸';redraw();renderShapeFocus();if(!$('confirmation').hidden)$('check').disabled=true;}}
 }
 function renderResults(){show('resultView');const independent=results.filter(r=>r.outcome.type==='correct'&&!r.outcome.hints&&!r.outcome.answerSeen&&!r.outcome.needsReview).length,helped=results.filter(r=>r.outcome.type==='correct'&&(r.outcome.hints||r.outcome.answerSeen||r.outcome.needsReview)).length,wrong=results.length-independent-helped;
  $('resultMessage').textContent=`${results.length}問練習しました。${storageAvailable?'記録はこの端末に保存しました。':'記録の保存ができません。学習の記録から書き出してください。'}`;metrics($('resultCounts'),[['自力で正解',independent],['ヒント・確認で正解',helped],['もう一度練習',wrong]]);$('resultItems').replaceChildren();
  const byChar=new Map();for(const r of results)byChar.set(r.q.char,r);for(const r of byChar.values()){const row=document.createElement('div');row.className='result-row';const c=document.createElement('strong');c.className='record-char';c.textContent=r.q.char;const text=document.createElement('div');text.textContent=r.q.word+'（'+r.q.reading+'）';const badge=document.createElement('span');badge.className='badge';badge.textContent=r.outcome.type==='correct'&&!r.outcome.hints&&!r.outcome.answerSeen&&!r.outcome.needsReview?'翌日以降に復習':'もう一度復習';row.append(c,text,badge);$('resultItems').append(row);}}
 function metrics(el,items){el.replaceChildren();for(const [label,n] of items){const div=document.createElement('div');div.className='metric';const strong=document.createElement('strong');strong.textContent=n;const span=document.createElement('span');span.textContent=label;div.append(strong,span);el.append(div);}}
-const reasonNames={reading:'よみをもう一度', 'different-character':'別の字に似ていた',count:'画の数',direction:'書く向き',order:'書き順',shape:'画の位置・長さ',answer:'答えを見て確認'};
+const reasonNames={reading:'よみをもう一度', 'different-character':'別の字に似ていた',protrusion:'横線より上に出る線',count:'画の数',direction:'書く向き',order:'書き順',shape:'画の位置・長さ',answer:'答えを見て確認'};
 function renderRecords(){
  const entries=Object.entries(store.records);metrics($('recordSummary'),[['練習したことば',entries.length],['復習の時期',entries.filter(([,r])=>r.due<=Date.now()).length],['自力で3回以上',entries.filter(([,r])=>r.stage>=3&&r.streak>=3).length]]);$('recordList').replaceChildren();
  if(!entries.length){const p=document.createElement('p');p.textContent='まだ記録はありません。単元を選んで練習してみよう。';$('recordList').append(p);return;}
