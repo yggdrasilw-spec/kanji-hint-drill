@@ -10,4 +10,8 @@
 #shapeFocus path{stroke-dasharray:3 2}
 #shapeFocus .focus-circle{stroke-width:1.2;fill:#fff0d833}
 #shapeFocus .focus-anchor{stroke-width:.6;fill:#b04e25}
+#shapeIssues{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+#shapeIssues[hidden]{display:none}
+#shapeIssues button{min-height:44px;font-size:15px;padding:10px 14px}
+#shapeIssues button[aria-pressed="true"]{background:#fff0d8;border-color:#b04e25;color:#853715}
 @media(max-width:650px){.shape-setting-grid{grid-template-columns:1fr}.shape-settings{padding:18px}}

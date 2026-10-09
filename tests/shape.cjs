@@ -32,11 +32,11 @@ let browser;
    shortResult:checkCharacterShape('鉄',short,ref),wrongResult:checkCharacterShape('鉄',wrong,ref),farResult:checkCharacterShape('鉄',cut(-.45),ref),reversedResult:checkCharacterShape('鉄',cut(-.45).map(s=>[...s].reverse()),ref)
   };
  },data.glyphs['鉄'].paths);
- console.log('GEOMETRY',JSON.stringify(geometry));
+ console.log('GEOMETRY',JSON.stringify(Object.fromEntries(Object.entries(geometry).filter(([k])=>!k.endsWith('Result')))));
  for(const k of ['correct','relaxed','transformed','shuffled'])assert.equal(geometry[k],'pass',k);
  for(const k of ['wrong','normal','strict','transformedWrong','touch'])assert.equal(geometry[k],'fail',k);
  for(const k of ['boundary','missing','malformed','nan'])assert.equal(geometry[k],'uncertain',k);
- assert.equal(geometry.off,'skipped');assert.equal(geometry.other,'skipped');assert.equal(geometry.normalized.protrusion,'normal');assert.equal(geometry.normalized.shape,'off');
+ assert.equal(geometry.off,'pass');assert.equal(geometry.other,'skipped');assert.equal(geometry.normalized.protrusion,'normal');assert.equal(geometry.normalized.shape,'off');
  for(const result of [geometry.shortResult,geometry.wrongResult,geometry.farResult,geometry.reversedResult]){
   assert.equal(result.status,'fail');const focus=result.focus;
   for(const point of [focus.tip,focus.acrossPoint])assert.ok(Math.hypot(point.x-focus.point.x,point.y-focus.point.y)+2<focus.radius);
@@ -57,6 +57,7 @@ let browser;
   const points=await page.evaluate(async ({paths,kind})=>{
    const ref=paths.map(d=>{const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);const len=p.getTotalLength();return Array.from({length:65},(_,i)=>{const pt=p.getPointAtLength(i*len/64);return {x:pt.x,y:pt.y};});});
    if(kind==='wrong')ref[11]=ref[11].filter(p=>p.y>40);
+   if(kind==='metalTop')ref[4]=[{x:ref[4][0].x,y:33},...ref[4]];
    if(kind==='boundary'){
     const b=ref[9],h={x:b.at(-1).x-b[0].x,y:b.at(-1).y-b[0].y},l2=h.x*h.x+h.y*h.y;
     const ext=p=>-(h.x*(p.y-b[0].y)-h.y*(p.x-b[0].x))/l2,s=ref[11];let i=1;while(i<s.length&&ext(s[i])>.14)i++;
@@ -85,6 +86,8 @@ let browser;
  records=await page.evaluate(()=>JSON.parse(localStorage.getItem('kanji-hint-drill-v1')).records);assert.equal(records[q.id].correct,1);assert.match(records[q.id].history.at(-1).shapePolicy,/protrusion=normal/);
  await page.click('#back');await start();await draw('boundary');const uncertain=await judge();console.log('UNCERTAIN',uncertain);assert.doesNotMatch(uncertain,/正解！/);assert.ok(await page.locator('#confirmation').isVisible());await page.click('#selfCorrect');
  records=await page.evaluate(()=>JSON.parse(localStorage.getItem('kanji-hint-drill-v1')).records);assert.equal(records[q.id].correct,1);assert.equal(records[q.id].helped,1);
+ await page.click('#back');await start();await draw('metalTop');const metalFeedback=await judge();console.log('METAL TOP',metalFeedback);assert.doesNotMatch(metalFeedback,/正解！/);assert.match(metalFeedback,/5画目.*上に/);
+ records=await page.evaluate(()=>JSON.parse(localStorage.getItem('kanji-hint-drill-v1')).records);assert.equal(records[q.id].history.at(-1).reason,'containment');assert.equal(records[q.id].history.at(-1).type,'wrong');
  await page.click('#back');await page.locator('.shape-settings summary').click();await page.selectOption('#shapeProtrusion','off');await start();await draw('wrong');assert.match(await judge(),/正解！/);
  assert.deepEqual(errors,[]);console.log('PASS: iron topology, thresholds, boundary, transforms, order/direction, invalid input, persistence/reset, settings mobile layout, real model wrong/correct/uncertain/off, review records and highlights');console.log('SCREENSHOTS',out);
  await browser.close();

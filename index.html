@@ -12,13 +12,23 @@
   <p>項目ごとに、どこまで確かめるかを選べます。この端末に保存され、次の練習から使います。</p>
   <div class="shape-setting-grid">
    <label for="shapeProtrusion">突き出し <small>まずは「鉄」の右側。上の横線より上に出る長さを確かめます。</small><select id="shapeProtrusion" data-shape-setting="protrusion"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
+   <label for="shapeContainment">突き抜けない <small>「鉄」の金偏の5画目が、上・下の線を突き抜けていないか確かめます。</small><select id="shapeContainment" data-shape-setting="containment"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
+   <label for="shapeConnection">線のつながり <small>「鉄」の金偏の2画目の始まりと、1画目の線との距離を確かめます。小さな筆離れは許容します。</small><select id="shapeConnection" data-shape-setting="connection"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
+   <label for="shapeRise">払い上げの傾き <small>「鉄」の金偏の8画目が、右上に向かうか確かめます。</small><select id="shapeRise" data-shape-setting="rise"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
    <label for="shapeCount">画数 <small>お手本と画の数を比べます。</small><select id="shapeCount" data-shape-setting="count"><option value="off">見ない</option><option value="normal">確認する</option></select></label>
    <label for="shapeDirection">書く方向 <small>反対向きに書いた画を確かめます。</small><select id="shapeDirection" data-shape-setting="direction"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
    <label for="shapeOrder">書き順 <small>画の順番をお手本と比べます。</small><select id="shapeOrder" data-shape-setting="order"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
    <label for="shapePosition">位置・長さ <small>画が少しずれても認める幅を選びます。</small><select id="shapePosition" data-shape-setting="shape"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
   </div>
-  <p class="shape-setting-note">「ゆるめ」は小さな突き出しでも認め、「厳しめ」ははっきりした突き出しを求めます。判断が難しい場合は、お手本と比べて確認します。画数が違う場合は、突き出しの判定も確認に回ります。</p>
-  <p class="shape-setting-note">とめ・はね・はらい、つく・離れる、突き抜けないの個別判定は準備中です。現在、これらの細部を理由に不正解にはしません。</p>
+  <p class="shape-setting-note">「厳しめ」は、突き出す長さをより長く求め、突き抜けや線の間隔の許容を小さくし、払いの向きを細かく確かめます。判断が難しい場合や画数が違う場合は、お手本と比べて確認します。</p>
+  <h3>美文字のヒント（正誤とは別）</h3>
+  <p>正しい字を書けたかとは別に、整った書き方を確かめます。助言が出ても、正解や自力で書けた記録はそのままです。初期設定はすべて「見ない」です。</p>
+  <div class="shape-setting-grid">
+   <label for="beautyParallel">横線の平行 <small>「鉄」の金偏の3・4画目、右側の10・11画目をそれぞれ比べます。</small><select id="beautyParallel" data-shape-setting="beautyParallel"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
+   <label for="beautySlope">横線の右上がり <small>お手本と同じ傾きかではなく、書いた横線がほどよく右上がりかを確かめます。</small><select id="beautySlope" data-shape-setting="beautySlope"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
+   <label for="shapeSweepEnd">右払いの終わり <small>「鉄」の13画目の終わりが、横向きになるか確かめます。</small><select id="shapeSweepEnd" data-shape-setting="sweepEnd"><option value="off">見ない</option><option value="relaxed">ゆるめ</option><option value="normal">標準</option><option value="strict">厳しめ</option></select></label>
+  </div>
+  <p class="shape-setting-note">右払いは線の向きを確かめます。途中で止めたかや、筆の力の変化は判定しません。横線の間隔は、字・部品ごとにそろえる場所を決めてから追加予定です。はね・他の字の個別判定も準備中です。</p>
   <button id="resetShapeSettings" type="button" class="text-button">おすすめの設定にもどす</button>
  </details>
  <div class="setup-grid"><div class="card unit-panel">
@@ -50,7 +60,7 @@
   <div class="canvas-tools"><button id="undo">ひとふで もどす</button><button id="clear">ぜんぶ けす</button><span id="strokeCount">0画</span></div>
   </div><div id="kanaTools" hidden><button id="kanaCommit" class="primary wide">この もじを よみとる</button><p id="kanaStatus" role="status"></p><div id="kanaCandidates" class="kana-candidates"></div><button id="deleteKana">よみの さいごを けす</button></div><button id="check" class="primary wide">できた！ たしかめる 🌸</button>
  </div><aside class="card hint-panel"><span class="eyebrow">こまったら ここ！</span><h2><span class="copy-chunk">ひとふで</span><wbr><span class="copy-chunk"> おてつだい。</span></h2><p>むずかしいときは、<br>ひとふでずつ みてみよう。</p><button id="hint" class="hint-button"><span class="hint-icon">一</span><span>ひとふで みせて<small><span class="copy-chunk">すこしずつ</span><wbr><span class="copy-chunk"> おもいだそう</span></small></span></button><button id="answer" class="text-button answer-button">こたえを みる</button>
-  <div id="feedback" class="feedback" role="status" aria-live="polite"></div><div id="confirmation" hidden><p>自分で書いた字と、答えを比べてね。</p><div class="two-buttons"><button id="selfCorrect">合っている</button><button id="selfWrong">もう一度練習</button></div></div>
+  <div id="feedback" class="feedback" role="status" aria-live="polite"></div><div id="shapeIssues" role="group" aria-label="丸で確かめるところを選ぶ" hidden></div><div id="confirmation" hidden><p>自分で書いた字と、答えを比べてね。</p><div class="two-buttons"><button id="selfCorrect">合っている</button><button id="selfWrong">もう一度練習</button></div></div>
   <button id="next" class="primary wide" hidden>つぎへ すすむ →</button><div class="practice-note"><strong>思い出せたら、また後で。</strong><p>ヒントを使った字や間違えた字は、少し間をあけてもう一度。自力で書けた字は、翌日以降に復習します。</p></div>
  </aside></div>
 </section>
