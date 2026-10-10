@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-10",
+  "glyphs": 1026,
+  "partsKeys": 1026,
+  "missing": [],
+  "pathMismatches": [],
+  "invalidRanges": [],
+  "gaps": [
+    "弱"
+  ],
+  "overlaps": [
+    "老",
+    "興"
+  ],
+  "multiRangeParts": 35,
+  "hashes": {
+    "kanji_parts.json": "39ec9969d61b877a7da85458129d3c98519246c611aa8e4d922f4e89d0c26cf4",
+    "radical_reference.json": "b78b99b864c4fdb70ae2e491f640cd6b309105c8c30d1dad8231f11265035386",
+    "bushu_validation.json": "c2e90bd153bc2ac6ce1e8cfeb97c068ca9af7c70cb23e351854fabc7ed38bdaa"
+  },
+  "radicalStatuses": {
+    "matched": 1024,
+    "candidate": 2,
+    "fallback": 0,
+    "missing": 0
+  },
+  "radicalReview": [
+    {
+      "char": "表",
+      "status": "review",
+      "method": "dictionary-svg-stroke-count-disagreement"
+    },
+    {
+      "char": "母",
+      "status": "review",
+      "method": "dictionary-svg-stroke-count-disagreement"
+    }
+  ],
+  "sourceRepository": "C:/Users/user/kakijun",
+  "sourceHead": "124ad37734887080d47d3d2f01a834dbd9a5c30d",
+  "sourceWorkingTree": "README.md was untracked; application and data files were read only",
+  "comparedApplication": "C:/Users/user/kanji-hint-drill",
+  "applicationHead": "0a536ec4fd2f60c320c4455affb50ffc1758ec88",
+  "rangeConvention": "zero-based inclusive",
+  "pathComparison": "ordered path d strings compared for all 1026 target glyphs",
+  "interpretation": "Machine structural check only; not validation of handwriting geometry or pedagogical correctness"
+}

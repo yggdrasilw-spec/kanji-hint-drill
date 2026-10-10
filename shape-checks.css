@@ -15,3 +15,9 @@
 #shapeIssues button{min-height:44px;font-size:15px;padding:10px 14px}
 #shapeIssues button[aria-pressed="true"]{background:#fff0d8;border-color:#b04e25;color:#853715}
 @media(max-width:650px){.shape-setting-grid{grid-template-columns:1fr}.shape-settings{padding:18px}}
+
+.writing-area{overflow:visible}
+#shapeFocus{overflow:visible}
+#shapeCharacter{width:100%;max-width:100%}
+#shapeCharacterRules label{overflow-wrap:anywhere}
+#shapeIssueText{font-size:16px;line-height:1.7;white-space:pre-line}

@@ -1,3 +1,4 @@
+import {savedShape} from './shape/policy.mjs';
 import {sentenceQuestions} from './sentences.mjs';
 export const STORAGE_KEY='kanji-hint-drill-v1';
 export const DAY=86400000;
@@ -27,7 +28,7 @@ export function updateRecord(previous,outcome,now=Date.now()){
  if(outcome.type==='correct'&&!aided){r.correct++;r.streak++;r.stage=Math.min(4,r.stage+1);r.due=now+[1,3,7,14][r.stage-1]*DAY;}
  else if(outcome.type==='correct'){r.helped++;r.streak=0;r.stage=Math.max(0,r.stage-1);r.due=now+10*60000;}
  else{r.errors++;r.streak=0;r.stage=0;r.due=now;}
- r.history=[...r.history,{time:now,type:outcome.type,hints:outcome.hints||0,answerSeen:!!outcome.answerSeen,reason:outcome.reason||'',recognized:outcome.recognized||null,shapePolicy:String(outcome.shapePolicy||'').slice(0,300),beautyNotes:(outcome.beautyNotes||[]).filter(x=>typeof x==='string').slice(0,12)}].slice(-30);
+ r.history=[...r.history,{...savedShape(outcome),time:now,type:outcome.type,hints:outcome.hints||0,answerSeen:!!outcome.answerSeen,reason:outcome.reason||'',recognized:outcome.recognized||null,shapePolicy:String(outcome.shapePolicy||'').slice(0,300),beautyNotes:(outcome.beautyNotes||[]).filter(x=>typeof x==='string').slice(0,12)}].slice(-30);
  return r;
 }
 export function buildQueue(questions,records,count=10,now=Date.now(),random=Math.random){
@@ -76,7 +77,7 @@ export function validateProgress(value){
   if(id.length>150||!r||typeof r!=='object')continue;
   const safe={history:[]};for(const k of ['attempts','correct','helped','errors','streak','stage','due','lastSeen'])safe[k]=Number.isFinite(r[k])&&r[k]>=0?Math.min(r[k],k==='due'||k==='lastSeen'?1e15:100000):0;
   safe.stage=Math.min(4,safe.stage);safe.lastOutcome=['correct','wrong','answer'].includes(r.lastOutcome)?r.lastOutcome:'wrong';
-  safe.history=(Array.isArray(r.history)?r.history:[]).slice(-30).map(h=>({time:Number(h.time)||0,type:['correct','wrong','answer'].includes(h.type)?h.type:'wrong',hints:Math.min(100,Number(h.hints)||0),answerSeen:!!h.answerSeen,reason:String(h.reason||'').slice(0,100),recognized:String(h.recognized||'').slice(0,2),shapePolicy:String(h.shapePolicy||'').slice(0,300),beautyNotes:(Array.isArray(h.beautyNotes)?h.beautyNotes:[]).filter(x=>typeof x==='string').slice(0,12).map(x=>x.slice(0,100))}));records[id]=safe;
+  safe.history=(Array.isArray(r.history)?r.history:[]).slice(-30).map(h=>({...savedShape(h),time:Number(h.time)||0,type:['correct','wrong','answer'].includes(h.type)?h.type:'wrong',hints:Math.min(100,Number(h.hints)||0),answerSeen:!!h.answerSeen,reason:String(h.reason||'').slice(0,100),recognized:String(h.recognized||'').slice(0,2),shapePolicy:String(h.shapePolicy||'').slice(0,300),beautyNotes:(Array.isArray(h.beautyNotes)?h.beautyNotes:[]).filter(x=>typeof x==='string').slice(0,12).map(x=>x.slice(0,100))}));records[id]=safe;
  }
  return {version:1,records};
 }

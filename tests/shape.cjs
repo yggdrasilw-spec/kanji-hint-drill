@@ -36,7 +36,8 @@ let browser;
  for(const k of ['correct','relaxed','transformed','shuffled'])assert.equal(geometry[k],'pass',k);
  for(const k of ['wrong','normal','strict','transformedWrong','touch'])assert.equal(geometry[k],'fail',k);
  for(const k of ['boundary','missing','malformed','nan'])assert.equal(geometry[k],'uncertain',k);
- assert.equal(geometry.off,'pass');assert.equal(geometry.other,'skipped');assert.equal(geometry.normalized.protrusion,'normal');assert.equal(geometry.normalized.shape,'off');
+ assert.equal(geometry.off,'pass');// 金 now has component rules; its behavior is covered by shape-expansion.test.mjs.
+ assert.equal(geometry.normalized.protrusion,'normal');assert.equal(geometry.normalized.shape,'off');
  for(const result of [geometry.shortResult,geometry.wrongResult,geometry.farResult,geometry.reversedResult]){
   assert.equal(result.status,'fail');const focus=result.focus;
   for(const point of [focus.tip,focus.acrossPoint])assert.ok(Math.hypot(point.x-focus.point.x,point.y-focus.point.y)+2<focus.radius);
@@ -48,9 +49,9 @@ let browser;
  const seed={version:1,records:{[q.id]:{attempts:0,correct:0,helped:0,errors:1,stage:0,streak:0,due:0,history:[]}}};
  await page.evaluate(({seed,unit})=>{localStorage.setItem('kanji-hint-drill-v1',JSON.stringify(seed));localStorage.setItem('kanji-hint-drill-v1-settings',JSON.stringify({grade:3,selections:{3:[unit]},multiple:false,length:5,mode:'write',vertical:true,scopeMode:'units'}));},{seed,unit:unit.id});
  await page.reload();await page.waitForFunction(()=>document.getElementById('modelStatus').textContent.includes('使えます'),{timeout:120000});
- await page.locator('.shape-settings summary').click();await page.selectOption('#shapeProtrusion','strict');await page.selectOption('#shapePosition','off');await page.reload();
+ await page.locator('.shape-settings > summary').click();await page.selectOption('#shapeProtrusion','strict');await page.selectOption('#shapePosition','off');await page.reload();
  assert.equal(await page.locator('#shapeProtrusion').inputValue(),'strict');assert.equal(await page.locator('#shapePosition').inputValue(),'off');
- await page.locator('.shape-settings summary').click();await page.click('#resetShapeSettings');assert.equal(await page.locator('#shapeProtrusion').inputValue(),'normal');
+ await page.locator('.shape-settings > summary').click();await page.click('#resetShapeSettings');assert.equal(await page.locator('#shapeProtrusion').inputValue(),'normal');
  for(const width of [320,390,1280]){await page.setViewportSize({width,height:950});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'settings width '+width);}
  fs.mkdirSync(out,{recursive:true});await page.setViewportSize({width:1280,height:950});await page.screenshot({path:path.join(out,'shape-settings.png'),fullPage:true});
  async function draw(kind){
@@ -88,7 +89,7 @@ let browser;
  records=await page.evaluate(()=>JSON.parse(localStorage.getItem('kanji-hint-drill-v1')).records);assert.equal(records[q.id].correct,1);assert.equal(records[q.id].helped,1);
  await page.click('#back');await start();await draw('metalTop');const metalFeedback=await judge();console.log('METAL TOP',metalFeedback);assert.doesNotMatch(metalFeedback,/正解！/);assert.match(metalFeedback,/5画目.*上に/);
  records=await page.evaluate(()=>JSON.parse(localStorage.getItem('kanji-hint-drill-v1')).records);assert.equal(records[q.id].history.at(-1).reason,'containment');assert.equal(records[q.id].history.at(-1).type,'wrong');
- await page.click('#back');await page.locator('.shape-settings summary').click();await page.selectOption('#shapeProtrusion','off');await start();await draw('wrong');assert.match(await judge(),/正解！/);
+ await page.click('#back');await page.locator('.shape-settings > summary').click();await page.selectOption('#shapeProtrusion','off');await start();await draw('wrong');assert.match(await judge(),/正解！/);
  assert.deepEqual(errors,[]);console.log('PASS: iron topology, thresholds, boundary, transforms, order/direction, invalid input, persistence/reset, settings mobile layout, real model wrong/correct/uncertain/off, review records and highlights');console.log('SCREENSHOTS',out);
  await browser.close();
 })().catch(async e=>{console.error(e);if(browser)await browser.close();process.exitCode=1;});

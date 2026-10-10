@@ -1,6 +1,6 @@
-import {STORAGE_KEY,selectScope,questionsFor,gradeCharacters,selectedCharacters,questionsForCharacters,updateRecord,buildQueue,summaryFor,analyzeStrokes,validateProgress} from './core.mjs';
+import {STORAGE_KEY,selectScope,questionsFor,gradeCharacters,selectedCharacters,questionsForCharacters,updateRecord,buildQueue,summaryFor,validateProgress} from './core.mjs';
 import {createReading,readingQuestions} from './reading.mjs';
-import {normalizeShapeSettings,checkCharacterShape} from './shape-rules.mjs';
+import {normalizeShapeSettings,checkCharacterShape,configureShapeData,analyzeCharacterWriting,sanitizeOverrides,DEFAULT_SHAPE_SETTINGS,rulesForCharacter} from './shape-rules.mjs';
 const $=id=>document.getElementById(id);
 let kana,reader;
 let data,session,labels,modelError='',modelReady=false,questions=[],queue=[],queueIndex=0,queueLimit=0,results=[],strokes=[],drawing=null,current=null,answerSeen=false,hints=0,judged=false,busy=false,token=0;
@@ -8,6 +8,7 @@ let store={version:1,records:{}},settings={grade:1,selections:{},multiple:true,l
 try{const raw=localStorage.getItem(STORAGE_KEY);if(raw)store=validateProgress(JSON.parse(raw));const saved=JSON.parse(localStorage.getItem(STORAGE_KEY+'-settings')||'null');if(saved&&[1,2,3,4,5,6].includes(+saved.grade)){settings={...settings,...saved};settings.selections=saved.selections&&typeof saved.selections==='object'?saved.selections:{};}}
 catch(e){storageAvailable=false;$('storageMessage').textContent='保存した記録を読み込めませんでした。練習はできますが、記録の保存状態を確認してください。';}
 settings.shapeChecks=normalizeShapeSettings(settings.shapeChecks);
+settings.shapeOverrides=sanitizeOverrides(settings.shapeOverrides);
 if(!['characters','units'].includes(settings.scopeMode))settings.scopeMode='characters';
 for(const control of document.querySelectorAll('[data-shape-setting]')){
  const key=control.dataset.shapeSetting;control.value=settings.shapeChecks[key];
@@ -16,7 +17,7 @@ for(const control of document.querySelectorAll('[data-shape-setting]')){
 $('resetShapeSettings').onclick=()=>{settings.shapeChecks=normalizeShapeSettings();for(const control of document.querySelectorAll('[data-shape-setting]'))control.value=settings.shapeChecks[control.dataset.shapeSetting];persist();};
 const canvas=$('canvas'),ctx=canvas.getContext('2d');
 function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localStorage.setItem(STORAGE_KEY+'-settings',JSON.stringify(settings));}catch(e){storageAvailable=false;$('storageMessage').textContent='記録を保存できません。学習後に「記録を書き出す」で保存してください。';}}
-function show(view){reader?.stop();for(const id of ['setupView','drillView','recordView','resultView'])$(id).hidden=id!==view;$('setupTab').classList.toggle('active',view==='setupView');$('progressTab').classList.toggle('active',view==='recordView');window.scrollTo({top:0,behavior:'smooth'});}
+function show(view){reader?.stop();shapeFocus=null;lastShape=null;activeShapePolicy=null;$('shapeFocus').replaceChildren();for(const id of ['setupView','drillView','recordView','resultView'])$(id).hidden=id!==view;$('setupTab').classList.toggle('active',view==='setupView');$('progressTab').classList.toggle('active',view==='recordView');window.scrollTo({top:0,behavior:'smooth'});}
 function units(){return data.grades.find(g=>g.grade===+settings.grade).units;}
 function selected(){return settings.selections[settings.grade]||[];}
 function renderCharacterCards(){
@@ -88,7 +89,7 @@ function redraw(){
  for(const s of [...strokes,...(drawing?[drawing]:[])]){if(!s.length)continue;ctx.beginPath();ctx.moveTo(s[0].x/109*480,s[0].y/109*480);for(const p of s.slice(1))ctx.lineTo(p.x/109*480,p.y/109*480);ctx.stroke();if(s.length===1){ctx.beginPath();ctx.arc(s[0].x/109*480,s[0].y/109*480,5.5,0,Math.PI*2);ctx.fill();}}
  $('strokeCount').textContent=strokes.length+'画';$('check').disabled=judged||busy||!strokes.length||!!drawing;if(reader?.active())reader.refresh();
 }
-function position(e){const r=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(109,(e.clientX-r.left)/r.width*109)),y:Math.max(0,Math.min(109,(e.clientY-r.top)/r.height*109))};}
+function position(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*109,y:(e.clientY-r.top)/r.height*109};}
 canvas.addEventListener('pointerdown',e=>{if(judged||busy||drawing||!current||e.button!==0)return;e.preventDefault();drawing=[position(e)];canvas.setPointerCapture(e.pointerId);redraw();});
 canvas.addEventListener('pointermove',e=>{if(!drawing||!canvas.hasPointerCapture(e.pointerId))return;e.preventDefault();for(const sample of (e.getCoalescedEvents?.()||[e])){const p=position(sample);if(Math.hypot(p.x-drawing.at(-1).x,p.y-drawing.at(-1).y)>.3)drawing.push(p);}redraw();});
 canvas.addEventListener('pointerup',e=>{if(!drawing||!canvas.hasPointerCapture(e.pointerId))return;drawing.push(position(e));strokes.push(drawing);drawing=null;canvas.releasePointerCapture(e.pointerId);redraw();});
@@ -116,8 +117,8 @@ function renderSentence(q,isRead){
 }
 function loadQuestion(){
  reader?.stop();token++;if(queueIndex>=queue.length){renderResults();return;}
- current=queue[queueIndex];strokes=[];drawing=null;hints=current.requiresHint?1:0;answerSeen=false;judged=false;busy=false;shapeFocus=null;
- $('shapeFocus').replaceChildren();$('shapeIssues').replaceChildren();$('shapeIssues').hidden=true;
+ current=queue[queueIndex];strokes=[];drawing=null;hints=current.requiresHint?1:0;answerSeen=false;judged=false;busy=false;shapeFocus=null;lastShape=null;activeShapePolicy=null;
+ $('shapeFocus').replaceChildren();$('shapeIssues').replaceChildren();$('shapeIssues').hidden=true;$('shapeIssueText').textContent='';
  const isRead=current.mode==='read';$('readingControls').hidden=!isRead;$('writingBox').hidden=false;$('kanaTools').hidden=true;setCopy('questionInstruction',isRead?['ぶんを よんで、','いろの ついた',' ことばを よもう']:['ぶんを よんで、','□の かんじを',' かこう']);$('reading').hidden=true;
  $('reading').textContent=current.reading;renderSentence(current,isRead);setCopy('cue',['よみがなと ぶんを',' ヒントに、','□の かんじを',' かいてね。']);
  $('position').textContent=`${queueIndex+1} / ${queue.length}問`;$('sessionBadge').textContent=store.records[current.id]?.errors?'復習':'練習';$('progressFill').style.width=(queueIndex/queue.length*100)+'%';
@@ -137,42 +138,42 @@ async function recognize(kind='kanji'){
 const homographs={'ニ':'二','エ':'工','カ':'力','タ':'夕'};
 function feedback(text,style='review'){$('feedback').textContent=text;$('feedback').className='feedback '+style;}
 function record(outcome){reader?.stop();
- if(current.mode!=='read')outcome.shapePolicy='v2;'+Object.entries(settings.shapeChecks).map(([k,v])=>k+'='+v).join(';');
+ if(current.mode!=='read'){const policy=activeShapePolicy?.settings||settings.shapeChecks;outcome.shapePolicy='v2;'+Object.keys(DEFAULT_SHAPE_SETTINGS).map(k=>k+'='+policy[k]).join(';');if(lastShape){outcome.engineVersion=lastShape.engineVersion;outcome.ruleSetVersion=lastShape.ruleSetVersion;outcome.shapeResults=lastShape.results;outcome.policySnapshot=lastShape.policySnapshot;}}
  if(judged)return;judged=true;store.records[current.id]=updateRecord(store.records[current.id],outcome);persist();results.push({q:current,outcome});
  if((outcome.type!=='correct'||outcome.hints>0||outcome.answerSeen||outcome.needsReview)&&queue.length<queueLimit){const at=Math.min(queue.length,queueIndex+4);if(!queue.slice(queueIndex+1).some(q=>q.id===current.id))queue.splice(at,0,current);}
  $('next').hidden=false;$('confirmation').hidden=true;$('check').disabled=true;$('clear').disabled=true;$('undo').disabled=true;$('answer').disabled=true;$('hint').disabled=true;if(reader?.active())reader.lock();
 }
 function offerConfirmation(text){feedback(text);answerSeen=true;renderGuide(true);$('confirmation').hidden=false;$('check').disabled=true;$('answer').disabled=true;}
-let shapeFocus=null;
+let shapeFocus=null,lastShape=null,activeShapePolicy=null;
 function renderShapeFocus(){
  const overlay=$('shapeFocus');overlay.replaceChildren();if(!shapeFocus)return;
- for(const number of new Set([shapeFocus.across,shapeFocus.stroke])){
+ for(const number of new Set([shapeFocus.across,shapeFocus.stroke,...(shapeFocus.actualIndices||[]).map(i=>i+1)])){
   const points=strokes[number-1];if(!points?.length)continue;
   const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',points.map((p,i)=>(i?'L':'M')+p.x+','+p.y).join(' '));overlay.append(path);
  }
  const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('cx',shapeFocus.point.x);circle.setAttribute('cy',shapeFocus.point.y);circle.setAttribute('r',shapeFocus.radius);circle.classList.add('focus-circle');overlay.append(circle);
- for(const point of [shapeFocus.tip,shapeFocus.acrossPoint]){
+ for(const point of (shapeFocus.anchors||[shapeFocus.tip,shapeFocus.acrossPoint]).filter(Boolean)){
   const anchor=document.createElementNS('http://www.w3.org/2000/svg','circle');anchor.setAttribute('cx',point.x);anchor.setAttribute('cy',point.y);anchor.setAttribute('r','1.3');anchor.classList.add('focus-anchor');overlay.append(anchor);
  }
 }
 function showShapeIssues(shape){
- const issues=shape.checks.filter(c=>c.status!=='pass');
+ const issues=shape.checks.filter(c=>!['pass','skipped','unavailable'].includes(c.status));
  shapeFocus=shape.focus||null;const panel=$('shapeIssues');panel.replaceChildren();panel.hidden=issues.length<2;
  for(const issue of issues){
   const button=document.createElement('button');button.type='button';button.textContent=issue.label;button.setAttribute('aria-pressed',String(issue.id===shape.ruleId));
-  button.onclick=()=>{shapeFocus=issue.focus||null;for(const b of panel.children)b.setAttribute('aria-pressed',String(b===button));renderShapeFocus();};panel.append(button);
+  button.onclick=()=>{shapeFocus=issue.focus||null;for(const b of panel.children)b.setAttribute('aria-pressed',String(b===button));renderShapeFocus();$('shapeIssueText').textContent=issue.text;};panel.append(button);
  }
- return issues.map(c=>c.text).join('\n');
+ $('shapeIssueText').textContent='';return issues.map(c=>c.text).join('\n');
 }
 async function check(){if(reader?.active()){reader.judge();return;}
  if(!strokes.length||judged||busy)return;
  if(!modelReady){offerConfirmation('自動判定が使えないため、答えのお手本と比べて確認しよう。');return;}
- busy=true;$('check').textContent='判定しています…';redraw();const requestToken=token;
+ activeShapePolicy={settings:{...settings.shapeChecks},overrides:sanitizeOverrides(settings.shapeOverrides)};lastShape=null;busy=true;$('check').textContent='判定しています…';redraw();const requestToken=token;
  try{
   const predictions=await recognize();if(requestToken!==token)return;const best=predictions[0],recognized=homographs[best.char]||best.char;
   if(best.confidence<.55){offerConfirmation('字の判定がはっきりしませんでした。誤答としては記録しません。お手本と比べて確認しよう。');return;}
-  const reference=referenceStrokes(),analysis=analyzeStrokes(strokes,reference,settings.shapeChecks);
-  const shape=checkCharacterShape(current.char,strokes,reference,settings.shapeChecks);
+  const reference=referenceStrokes(),analysis=analyzeCharacterWriting(current.char,strokes,reference,activeShapePolicy.settings);
+  const shape=checkCharacterShape(current.char,strokes,reference,activeShapePolicy.settings,{overrides:activeShapePolicy.overrides});lastShape=shape;
   if(recognized===current.char){
    if(shape.status==='fail'){
     feedback('もう少し！ 線の形を なおそう。\n'+showShapeIssues(shape)+'\n丸の中の 線の先・向き・つながりを 比べよう。');
@@ -181,8 +182,11 @@ async function check(){if(reader?.active()){reader.judge();return;}
    if(shape.status==='uncertain'){
     offerConfirmation('「'+current.char+'」に見えました。\n'+(showShapeIssues(shape)||shape.text));return;
    }
+   const writing=shape.writingChecks?.filter(c=>!['pass','skipped','unavailable'].includes(c.status))||[];
+   if(writing.length){analysis.type=writing[0].kind;analysis.text=writing.map(c=>c.text).join('\n');}
    const beauty=shape.beautyChecks?.filter(c=>c.status!=='pass')||[];
-   const beautyText=beauty.length?'\n美文字のヒント：\n'+showShapeIssues({checks:beauty,focus:beauty[0].focus,ruleId:beauty[0].id}):'';
+   const beautyText=beauty.length?'\n美文字のヒント：\n'+beauty.map(c=>c.text).join('\n'):'';
+   const issues=[...writing,...beauty];if(issues.length)showShapeIssues({checks:issues,focus:issues[0].focus,ruleId:issues[0].id});
    feedback(`正解！${hints||answerSeen?' ヒントを使って思い出せたね。':' 自分の力で書けたね。'}\n${analysis.text}${beautyText}`,analysis.type==='good'?'good':'review');
    // Correct character with a stroke problem needs review; it is not counted as fluent mastery.
    const outcome={type:'correct',hints,answerSeen,reason:analysis.type==='good'?'':analysis.type,recognized,needsReview:analysis.type!=='good',beautyNotes:beauty.map(c=>c.id)};
@@ -199,7 +203,7 @@ function renderResults(){show('resultView');const independent=results.filter(r=>
  $('resultMessage').textContent=`${results.length}問練習しました。${storageAvailable?'記録はこの端末に保存しました。':'記録の保存ができません。学習の記録から書き出してください。'}`;metrics($('resultCounts'),[['自力で正解',independent],['ヒント・確認で正解',helped],['もう一度練習',wrong]]);$('resultItems').replaceChildren();
  const byChar=new Map();for(const r of results)byChar.set(r.q.char,r);for(const r of byChar.values()){const row=document.createElement('div');row.className='result-row';const c=document.createElement('strong');c.className='record-char';c.textContent=r.q.char;const text=document.createElement('div');text.textContent=r.q.word+'（'+r.q.reading+'）';const badge=document.createElement('span');badge.className='badge';badge.textContent=r.outcome.type==='correct'&&!r.outcome.hints&&!r.outcome.answerSeen&&!r.outcome.needsReview?'翌日以降に復習':'もう一度復習';row.append(c,text,badge);$('resultItems').append(row);}}
 function metrics(el,items){el.replaceChildren();for(const [label,n] of items){const div=document.createElement('div');div.className='metric';const strong=document.createElement('strong');strong.textContent=n;const span=document.createElement('span');span.textContent=label;div.append(strong,span);el.append(div);}}
-const reasonNames={reading:'よみをもう一度', 'different-character':'別の字に似ていた',protrusion:'横線より上に出る線',containment:'金へんの縦線の上下',connection:'金へんの1・2画目のつながり',rise:'金へんの8画目の払い上げ',sweepEnd:'右払いの終わり',count:'画の数',direction:'書く向き',order:'書き順',shape:'画の位置・長さ',answer:'答えを見て確認'};
+const reasonNames={internalBars:'囲みの中の横線',strokePresence:'必要な線の過不足',topology:'線の位置関係',lengthIdentity:'字を区別する線の長短',compactEnding:'短い終画の収まり',hookGeometry:'はねの形',sweepGeometry:'はらいの向き',risingStroke:'偏の払い上げ',boundedEndpoint:'縦線の上下',contact:'線のつながり',reading:'よみをもう一度', 'different-character':'別の字に似ていた',protrusion:'横線より上に出る線',containment:'金へんの縦線の上下',connection:'金へんの1・2画目のつながり',rise:'金へんの8画目の払い上げ',sweepEnd:'右払いの終わり',count:'画の数',direction:'書く向き',order:'書き順',shape:'画の位置・長さ',answer:'答えを見て確認'};
 function renderRecords(){
  const entries=Object.entries(store.records);metrics($('recordSummary'),[['練習したことば',entries.length],['復習の時期',entries.filter(([,r])=>r.due<=Date.now()).length],['自力で3回以上',entries.filter(([,r])=>r.stage>=3&&r.streak>=3).length]]);$('recordList').replaceChildren();
  if(!entries.length){const p=document.createElement('p');p.textContent='まだ記録はありません。単元を選んで練習してみよう。';$('recordList').append(p);return;}
@@ -217,7 +221,7 @@ $('characterSelectAll').onclick=()=>{settings.characters=Object.keys(data.glyphs
 $('characterSelectNone').onclick=()=>{settings.characters=[];persist();syncCharacterCards();refreshScope();};
 $('selectAll').onclick=()=>{settings.selections[settings.grade]=units().map(u=>u.id);persist();renderUnits();refreshScope();};$('selectNone').onclick=()=>{settings.selections[settings.grade]=[];persist();renderUnits();refreshScope();};$('start').onclick=$('quickStart').onclick=begin;
 $('setupTab').onclick=$('back').onclick=$('finish').onclick=()=>{token++;busy=false;show('setupView');refreshScope();};$('progressTab').onclick=()=>{token++;busy=false;renderRecords();show('recordView');};$('restart').onclick=begin;
-$('undo').onclick=()=>{if(judged||busy)return;strokes.pop();redraw();};$('clear').onclick=()=>{if(judged||busy)return;strokes=[];drawing=null;redraw();};
+$('undo').onclick=()=>{if(judged||busy)return;strokes.pop();shapeFocus=null;lastShape=null;$('shapeIssues').hidden=true;$('shapeIssueText').textContent='';redraw();};$('clear').onclick=()=>{if(judged||busy)return;strokes=[];drawing=null;shapeFocus=null;lastShape=null;$('shapeIssues').hidden=true;$('shapeIssueText').textContent='';redraw();};
 $('hint').onclick=()=>{if(judged||busy)return;hints++;renderGuide();if(reader?.active()){feedback('ひらがなの ヒントを ひとふで ふやしたよ。');return;}feedback(`${hints}画目まで表示しました。続きは自分で書いてみよう。`);};
 $('answer').onclick=()=>{if(judged||busy)return;answerSeen=true;renderGuide(true);if(reader?.active()){feedback('こたえは「'+current.reading+'」。こえに だして よんでみよう。');record({type:'answer',hints,answerSeen:true,reason:'answer'});return;}feedback(`答えは「${current.char}」。${data.glyphs[current.char].paths.length}画です。\n1画目から順番に見直そう。`);record({type:'answer',hints,answerSeen:true,reason:'answer'});};$('check').onclick=check;
 $('selfCorrect').onclick=()=>{feedback('お手本と比べて確認できたね。次はヒントなしで思い出そう。','good');record({type:'correct',hints,answerSeen:true,reason:'answer'});};$('selfWrong').onclick=()=>{feedback('もう一度練習する字として記録しました。');record({type:'wrong',hints,answerSeen:true,reason:'answer'});};
@@ -226,6 +230,8 @@ $('export').onclick=()=>{const blob=new Blob([JSON.stringify(store,null,2)],{typ
 $('import').onchange=async()=>{try{const file=$('import').files[0];if(!file)return;if(file.size>5e6)throw Error('記録ファイルが大きすぎます。');const incoming=validateProgress(JSON.parse(await file.text()));for(const [id,r] of Object.entries(incoming.records))if(!store.records[id]||(r.lastSeen||0)>(store.records[id].lastSeen||0))store.records[id]=r;persist();renderRecords();$('storageMessage').textContent='記録を読み込みました。新しい記録を優先してまとめています。';}catch(e){$('storageMessage').textContent='読み込めませんでした：'+e.message;}finally{$('import').value='';}};
 try{
  [data,kana]=await Promise.all([fetchJSON('./data/curriculum.json'),fetchJSON('./data/kana.json')]);
+ try{const [components,rules]=await Promise.all([fetchJSON('./data/shape-components.json'),fetchJSON('./data/shape-rules.json')]);configureShapeData(components,rules);$('shapeCoverage').textContent='1,026字の共通評価・部品評価を利用できます。新しい骨組み規則は資料・目視レビュー待ちのため、問題を見つけた場合は自己確認に回します。実筆跡での校正は未実施です。';}catch(e){$('shapeCoverage').textContent='追加の字形データを読み込めません。文字認識と従来の確認で練習できます。';console.warn(e);}
+ setupCharacterShapeSettings();
  reader=createReading({$,kana,getCurrent:()=>current,getState:()=>({judged,busy,strokes,drawing,hints,answerSeen}),setStrokes:s=>{strokes=s;redraw();},setBusy:value=>{busy=value;redraw();},recognize,record,feedback});reader.setQuestions(()=>questions);
  if(!['write','read'].includes(settings.mode))settings.mode='write';
  document.body.classList.toggle('vertical-ui',settings.vertical!==false);
@@ -236,3 +242,15 @@ try{
  for(const g of data.grades)if(!Array.isArray(settings.selections[g.grade]))settings.selections[g.grade]=[g.units[0].id];
  settings.characters=selectedCharacters(data,settings.characters);renderCharacterCards();renderScopeMode();renderUnits();refreshScope();await loadModel();
 }catch(e){$('fatal').hidden=false;$('fatal').textContent='漢字のデータを読み込めません。HTTPでアプリを開き直してください。';console.error(e);}
+
+function setupCharacterShapeSettings(){
+ const select=$('shapeCharacter');for(const char of Object.keys(data.glyphs).sort((a,b)=>data.glyphs[a].grade-data.glyphs[b].grade||a.codePointAt(0)-b.codePointAt(0))){const o=document.createElement('option');o.value=char;o.textContent=char+'（'+data.glyphs[char].grade+'年）';select.append(o);}
+ const names={protrusion:'鉄：突き出し',containment:'鉄：突き抜けない',connection:'鉄：線の接続',rise:'鉄：払い上げ',sweepEnd:'鉄：右払いの終わり',beautyParallel:'横線の平行',beautySlope:'横線の右上がり',structure:'骨組み・線の過不足',internalBars:'囲みの中の横線',identityLength:'字を区別する長短',identityExtent:'字を区別する突出',compactEnding:'短い終画',writingHook:'はねの形',writingSweep:'はらいの形',writingRise:'偏の払い上げ',writingBounds:'偏の縦線の上下',writingContact:'偏の線の接続',beautyLength:'美文字：線の長短',beautyAspect:'美文字：部品の幅',beautySpacing:'美文字：目の間隔'};
+ function render(){const char=select.value,box=$('shapeCharacterRules');box.replaceChildren();const own=settings.shapeOverrides[char]||{categories:{},rules:{}};
+  const add=(key,label,type,category)=>{const row=document.createElement('label'),title=document.createElement('span');title.textContent=label;const control=document.createElement('select');for(const [v,t] of [['','共通設定を使う'],['off','見ない'],['relaxed','ゆるめ'],['normal','標準'],['strict','厳しめ']]){const o=document.createElement('option');o.value=v;o.textContent=t;control.append(o);}control.value=own[type][key]||'';control.dataset.category=category;if(type==='rules')control.dataset.ruleId=key;const note=document.createElement('small');const actual=()=>{const global=settings.shapeChecks[category],value=global==='off'?'off':own.rules[type==='rules'?key:'']||own.categories[category]||global;note.textContent='実効値：'+({off:'見ない',relaxed:'ゆるめ',normal:'標準',strict:'厳しめ'}[value]||'見ない')+(global==='off'?'（共通設定が優先）':own[type][key]?'（この字の調整）':'（継承）');};actual();control.onchange=()=>{if(control.value)own[type][key]=control.value;else delete own[type][key];settings.shapeOverrides[char]=own;persist();actual();};row.append(title,control,note);box.append(row);};
+  const applicable=new Set(rulesForCharacter(char).map(r=>r.category));for(const [key,label] of Object.entries(names))if(applicable.has(key))add(key,label,'categories',key);
+  for(const rule of rulesForCharacter(char))add(rule.id,rule.label+'：'+rule.kind,'rules',rule.category);
+  $('resetCharacterShape').onclick=()=>{delete settings.shapeOverrides[char];persist();render();};
+ }
+ select.onchange=render;render();for(const control of document.querySelectorAll('[data-shape-setting]'))control.addEventListener('change',render);$('resetShapeSettings').addEventListener('click',render);
+}
