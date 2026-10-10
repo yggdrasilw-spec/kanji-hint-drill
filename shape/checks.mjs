@@ -4,6 +4,10 @@ const limits=(level,values)=>values[{relaxed:0,normal:1,strict:2}[level]];
 const banded=(value,min,max,band)=>value<min-band||value>max+band?'fail':value<min+band||value>max-band?'uncertain':'pass';
 const unavailable=reason=>({status:'unavailable',confidence:'none',reasonCode:reason});
 const unsure=reason=>({status:'uncertain',confidence:'low',reasonCode:reason});
+function hookTurn(points,scale){
+ const ps=resample(points,101),before=sub(ps[85],ps[70]),tails=[1,2,3,5,8,12].map(n=>sub(ps[100],ps[100-n])).filter(v=>norm(v)>=scale*.006);
+ return {ps,turn:norm(before)<scale*.008||!tails.length?null:Math.max(...tails.map(last=>Math.abs(angle(before,last))))};
+}
 function componentBox(ctx){
  const wall=ctx.get('leftWall'),roof=ctx.get('roof'),bottom=ctx.get('bottom');if(!wall?.stable||!roof?.stable||(ctx.rule.kind==='internalBars'&&!bottom?.stable))return null;
  const f=frame(roof.points);if(!f||f.length<ctx.match.scale*.045)return null;
@@ -51,9 +55,11 @@ export function evaluateRule(ctx){
   return {status,confidence:found.unstable?'low':'high',reasonCode:count<p.count?'missing-internal-bar':count>p.count?'extra-internal-bar':'internal-bars-present',observed:{count},expected:{count:p.count},focus:focus([],box.indices,[],box.polygon,'component-region'),text:ctx.instance.attributes.element+'の 中の 横線は '+p.count+'本。いまは '+count+'本に 見えます。'+(count<p.count?'足りない線を 確かめよう。':count>p.count?'余分な線を 確かめよう。':'横線の 位置を 比べよう。')};
  }
  if(rule.kind==='topology'){
-  const problems=[];let uncertain=false;for(const pair of p.relations){const a=ctx.get(pair.a),b=ctx.get(pair.b);if(!a?.stable||!b?.stable){uncertain=true;continue;}
-   const gap=lineDistance(a.points,b.points)/match.scale,max=limits(level,[.085,.065,.045]);if(gap>max+.012)problems.push({a,b,gap,max});else if(gap>max-.012)uncertain=true;
-  }const issue=problems[0];return {status:issue?'fail':uncertain?'uncertain':'pass',confidence:issue?'high':uncertain?'low':'high',reasonCode:issue?'contact-gap':'contact-signature',observed:issue?{gap:issue.gap}:undefined,expected:issue?{maximum:issue.max}:undefined,focus:issue?focus([issue.a.points,issue.b.points],[...issue.a.indices,...issue.b.indices]):null};
+  const problems=[],borderline=[];let ambiguous=false;for(const pair of p.relations){const a=ctx.get(pair.a),b=ctx.get(pair.b);if(!a?.stable||!b?.stable){ambiguous=true;continue;}
+   const gap=lineDistance(a.points,b.points)/match.scale,max=limits(level,[.085,.065,.045]);if(gap>max+.012)problems.push({a,b,gap,max,pair});else if(gap>max-.012)borderline.push({a,b,gap,max,pair});
+  }
+  const issue=problems[0]||borderline[0],status=problems.length?'fail':borderline.length||ambiguous?'uncertain':'pass';
+  return {status,confidence:status==='fail'?'high':status==='uncertain'?'low':'high',reasonCode:issue?'contact-gap':ambiguous?'ambiguous-contact-correspondence':'contact-signature',observed:issue?{gap:issue.gap}:undefined,expected:issue?{maximum:issue.max}:undefined,focus:issue?focus([issue.a.points,issue.b.points],[...issue.a.indices,...issue.b.indices]):null,text:issue?'色のついた 二本の つながりを、お手本と 比べよう。':ambiguous?'線の対応が はっきりしませんでした。字全体を、お手本と 比べよう。':rule.text};
  }
  if(ms.some(m=>!m?.stable))return unsure('ambiguous-role-correspondence');
  const [a,b]=ms,points=a?.points;if(!points)return unavailable('role-missing');
@@ -78,10 +84,14 @@ export function evaluateRule(ctx){
   const [min,max]=rule.kind==='parallel'?[0,limits(level,[14,10,6])]:limits(level,[[-2,20],[0,16],[2,12]]);return {status:rule.kind==='parallel'&&theta<max-1?'pass':banded(theta,min,max,1),confidence:'high',reasonCode:'horizontal-angle',observed:{angle:theta},expected:{minimum:min,maximum:max},focus:foc()};
  }
  if(['protrusion','boundedEndpoint','contact','crossing','separation'].includes(rule.kind)){
+  if(rule.kind==='contact'||rule.kind==='separation'){
+   const length=dist(b.points[0],b.points.at(-1));if(length<match.scale*.04)return unsure('short-contact-reference');
+   const endpoint=p.end==='finish'||p.end==='end'||p.side==='below'?points.at(-1):points[0],near=nearest(endpoint,b.points),gap=near.distance/length;
+   const threshold=limits(level,rule.kind==='contact'?[.22,.17,.12]:[.015,.035,.055]),status=rule.kind==='contact'?(gap>threshold+.015?'fail':gap>threshold-.015?'uncertain':'pass'):(gap<threshold-.01?'fail':gap<threshold+.01?'uncertain':'pass');
+   return {status,confidence:status==='uncertain'?'low':'high',reasonCode:rule.kind==='contact'?'endpoint-contact':'required-gap',observed:{gap},expected:rule.kind==='contact'?{maximum:threshold}:{minimum:threshold},focus:focus([],indices,[endpoint,near.point],null,'endpoint-pair')};
+  }
   const base=frame(b.points);if(!base)return unsure('unstable-reference-axis');const endpoint=p.side==='below'?points.at(-1):points[0],near=nearest(endpoint,b.points),signed=dot(sub(endpoint,near.point),base.y)/base.length*(p.side==='below'?1:-1),gap=near.distance/base.length;
-  let status,reason,expected;if(rule.kind==='contact'){const max=limits(level,[.22,.17,.12]);status=banded(gap,0,max,.015);if(gap<max-.015)status='pass';reason='endpoint-contact';expected={maximum:max};}
-  else if(rule.kind==='separation'){const min=limits(level,[.015,.035,.055]);status=gap<min-.01?'fail':gap<min+.01?'uncertain':'pass';reason='required-gap';expected={minimum:min};}
-  else if(rule.kind==='crossing'){status=intersections(points,b.points).length?'pass':'uncertain';reason='crossing';}
+  let status,reason,expected;if(rule.kind==='crossing'){status=intersections(points,b.points).length?'pass':'uncertain';reason='crossing';}
   else if(rule.kind==='boundedEndpoint'){const max=limits(level,[.16,.10,.065]);status=signed>max+.018?'fail':signed>max-.018?'uncertain':'pass';reason='bounded-endpoint';expected={maximum:max};}
   else{const min=limits(level,[.03,.07,.12]);status=signed<min-.018?'fail':signed<min+.018?'uncertain':intersections(points,b.points).length?'pass':'uncertain';reason='required-protrusion';expected={minimum:min};}
   return {status,confidence:status==='uncertain'?'low':'high',reasonCode:reason,observed:{extension:signed,gap},expected,focus:focus([],indices,[endpoint,near.point],null,'endpoint-pair')};
@@ -96,8 +106,14 @@ export function evaluateRule(ctx){
   return {status:rule.kind==='risingStroke'?(theta<min-2?'fail':theta<min+2?'uncertain':'pass'):(theta<-75||theta>20?'fail':'pass'),confidence:'medium',reasonCode:'ending-direction',observed:{angle:theta},expected:{minimum:min},focus:foc()};
  }
  if(rule.kind==='hookGeometry'){
-  const ps=resample(a.rawPoints,41),before=sub(ps[35],ps[29]),last=sub(ps[40],ps[35]),turn=Math.abs(angle(before,last));if(Math.min(norm(before),norm(last))<match.scale*.008)return unsure('short-hook');
-  const min=limits(level,[20,30,42]);return {status:turn<min-5?'fail':turn<min+5?'uncertain':'pass',confidence:'medium',reasonCode:'ending-turn',observed:{turn},expected:{minimum:min},focus:focus([ps.slice(29)],a.indices,[ps[29],ps.at(-1)],null,'line-group')};
+  // Measure the written direction and several short tails. A fixed final 12.5%
+  // averages a small hook together with its much longer stem.
+  const reference=ctx.expected?.[ctx.instance?.roles[rule.roles[0]]?.stroke-1];
+  let min=limits(level,[20,30,42]);
+  if(reference){const ref=hookTurn(reference,bounds(ctx.expected).size);if(ref.turn===null||ref.turn<20)return unavailable('reference-hook-not-established');min=Math.min(min,ref.turn*limits(level,[.5,.65,.8]));}
+  const {ps,turn}=hookTurn(a.rawPoints,match.scale),f=focus([ps.slice(70)],a.indices,[ps[70],ps.at(-1)],null,'line-group');
+  if(turn===null)return {...unsure('short-hook'),focus:f};
+  return {status:turn<min-5?'fail':turn<min+5?'uncertain':'pass',confidence:'medium',reasonCode:'ending-turn',observed:{turn},expected:{minimum:min},focus:f};
  }
  return unavailable('checker-not-implemented');
 }

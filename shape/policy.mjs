@@ -1,6 +1,6 @@
-export const ENGINE_VERSION='component-engine-1';
+export const ENGINE_VERSION='component-engine-2';
 export const LEVELS=['off','relaxed','normal','strict'];
-export const EXTRA_DEFAULTS=Object.freeze({structure:'normal',internalBars:'normal',identityLength:'normal',identityExtent:'normal',compactEnding:'off',writingHook:'off',writingSweep:'off',writingRise:'off',writingBounds:'off',writingContact:'off',beautyLength:'off',beautyAspect:'off',beautySpacing:'off'});
+export const EXTRA_DEFAULTS=Object.freeze({structure:'normal',structureContact:'off',internalBars:'normal',identityLength:'normal',identityExtent:'normal',compactEnding:'off',writingHook:'off',writingSweep:'off',writingRise:'off',writingBounds:'off',writingContact:'off',beautyLength:'off',beautyAspect:'off',beautySpacing:'off'});
 export function sanitizeOverrides(value){
  const out={};if(!value||typeof value!=='object'||Array.isArray(value))return out;
  for(const [char,entry] of Object.entries(value).slice(0,1026)){

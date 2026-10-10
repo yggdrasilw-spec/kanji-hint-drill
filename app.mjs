@@ -158,12 +158,13 @@ function renderShapeFocus(){
 }
 function showShapeIssues(shape){
  const issues=shape.checks.filter(c=>!['pass','skipped','unavailable'].includes(c.status));
- shapeFocus=shape.focus||null;const panel=$('shapeIssues');panel.replaceChildren();panel.hidden=issues.length<2;
+ const selected=issues.find(c=>c.id===shape.ruleId&&c.focus)||issues.find(c=>c.focus)||issues[0];
+ shapeFocus=selected?.focus||shape.focus||null;const panel=$('shapeIssues');panel.replaceChildren();panel.hidden=issues.length<2;
  for(const issue of issues){
-  const button=document.createElement('button');button.type='button';button.textContent=issue.label;button.setAttribute('aria-pressed',String(issue.id===shape.ruleId));
+  const button=document.createElement('button');button.type='button';button.textContent=issue.label;button.setAttribute('aria-pressed',String(issue===selected));
   button.onclick=()=>{shapeFocus=issue.focus||null;for(const b of panel.children)b.setAttribute('aria-pressed',String(b===button));renderShapeFocus();$('shapeIssueText').textContent=issue.text;};panel.append(button);
  }
- $('shapeIssueText').textContent='';return issues.map(c=>c.text).join('\n');
+ $('shapeIssueText').textContent=selected?.text||'';renderShapeFocus();return issues.map(c=>c.text).join('\n');
 }
 async function check(){if(reader?.active()){reader.judge();return;}
  if(!strokes.length||judged||busy)return;
@@ -245,7 +246,7 @@ try{
 
 function setupCharacterShapeSettings(){
  const select=$('shapeCharacter');for(const char of Object.keys(data.glyphs).sort((a,b)=>data.glyphs[a].grade-data.glyphs[b].grade||a.codePointAt(0)-b.codePointAt(0))){const o=document.createElement('option');o.value=char;o.textContent=char+'（'+data.glyphs[char].grade+'年）';select.append(o);}
- const names={protrusion:'鉄：突き出し',containment:'鉄：突き抜けない',connection:'鉄：線の接続',rise:'鉄：払い上げ',sweepEnd:'鉄：右払いの終わり',beautyParallel:'横線の平行',beautySlope:'横線の右上がり',structure:'骨組み・線の過不足',internalBars:'囲みの中の横線',identityLength:'字を区別する長短',identityExtent:'字を区別する突出',compactEnding:'短い終画',writingHook:'はねの形',writingSweep:'はらいの形',writingRise:'偏の払い上げ',writingBounds:'偏の縦線の上下',writingContact:'偏の線の接続',beautyLength:'美文字：線の長短',beautyAspect:'美文字：部品の幅',beautySpacing:'美文字：目の間隔'};
+ const names={protrusion:'鉄：突き出し',containment:'鉄：突き抜けない',connection:'鉄：線の接続',rise:'鉄：払い上げ',sweepEnd:'鉄：右払いの終わり',beautyParallel:'横線の平行',beautySlope:'横線の右上がり',structure:'骨組み・線の過不足',structureContact:'線の接触（参考）',internalBars:'囲みの中の横線',identityLength:'字を区別する長短',identityExtent:'字を区別する突出',compactEnding:'短い終画',writingHook:'はねの形',writingSweep:'はらいの形',writingRise:'偏の払い上げ',writingBounds:'偏の縦線の上下',writingContact:'偏の線の接続',beautyLength:'美文字：線の長短',beautyAspect:'美文字：部品の幅',beautySpacing:'美文字：目の間隔'};
  function render(){const char=select.value,box=$('shapeCharacterRules');box.replaceChildren();const own=settings.shapeOverrides[char]||{categories:{},rules:{}};
   const add=(key,label,type,category)=>{const row=document.createElement('label'),title=document.createElement('span');title.textContent=label;const control=document.createElement('select');for(const [v,t] of [['','共通設定を使う'],['off','見ない'],['relaxed','ゆるめ'],['normal','標準'],['strict','厳しめ']]){const o=document.createElement('option');o.value=v;o.textContent=t;control.append(o);}control.value=own[type][key]||'';control.dataset.category=category;if(type==='rules')control.dataset.ruleId=key;const note=document.createElement('small');const actual=()=>{const global=settings.shapeChecks[category],value=global==='off'?'off':own.rules[type==='rules'?key:'']||own.categories[category]||global;note.textContent='実効値：'+({off:'見ない',relaxed:'ゆるめ',normal:'標準',strict:'厳しめ'}[value]||'見ない')+(global==='off'?'（共通設定が優先）':own[type][key]?'（この字の調整）':'（継承）');};actual();control.onchange=()=>{if(control.value)own[type][key]=control.value;else delete own[type][key];settings.shapeOverrides[char]=own;persist();actual();};row.append(title,control,note);box.append(row);};
   const applicable=new Set(rulesForCharacter(char).map(r=>r.category));for(const [key,label] of Object.entries(names))if(applicable.has(key))add(key,label,'categories',key);

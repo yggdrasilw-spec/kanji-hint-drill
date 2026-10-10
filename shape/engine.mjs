@@ -1,13 +1,24 @@
 import {matchStrokes} from './matching.mjs';
 import {evaluateRule} from './checks.mjs';
 import {ENGINE_VERSION,effectivePolicy,snapshot,aggregate} from './policy.mjs';
+import {hasHook} from './stroke-types.mjs';
 let componentData=null,ruleData=null;
 export function configureShapeData(components,rules){
  if(components?.version!==1||rules?.version!==1)throw Error('Unsupported shape data');componentData=components;ruleData=rules;
 }
 export function rulesForCharacter(char){
  const entry=componentData?.characters?.[char];if(!entry)return [];
- return entry.rules.map(binding=>({...ruleData.templates[binding.templateId],...binding}));
+ const rules=entry.rules.map(binding=>({...ruleData.templates[binding.templateId],...binding}));
+ // Old generated contact signatures described the printed sample, not required
+ // character distinctions. Keep them optional and independent of missing lines.
+ for(const rule of rules)if(rule.kind==='topology')Object.assign(rule,{layer:'writing',category:'structureContact'});
+ const root=entry.components.find(c=>c.parentId===null);
+ if(root)entry.strokeTypes.forEach((type,i)=>{
+  const role='line-'+(i+1);
+  if(!hasHook(type)||rules.some(r=>r.kind==='hookGeometry'&&r.roles.some(name=>entry.components.find(c=>c.id===r.instanceId)?.roles[name]?.stroke===i+1)))return;
+  rules.push({id:root.id+'.hookGeometry.ending-'+(i+1),version:2,instanceId:root.id,roles:[role],kind:'hookGeometry',layer:'writing',category:'writingHook',label:(i+1)+'画目のはね',text:(i+1)+'画目の 終わりの はねを、お手本と 比べよう。',review:{status:'synthetic-candidate'}});
+ });
+ return rules;
 }
 export function evaluateCharacter(char,strokes,expected,settings,options={}){
  const entry=componentData?.characters?.[char],rules=rulesForCharacter(char),mode=options.mode==='evaluation'?'evaluation':'normal';

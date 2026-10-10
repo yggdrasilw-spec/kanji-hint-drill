@@ -98,7 +98,7 @@ def main():
             for j in range(i+1,len(samples)):
                 g=min(gap(samples[i],samples[j]),gap(samples[j],samples[i]))
                 if g<2.5:relations.append({'a':f'line-{i+1}','b':f'line-{j+1}','relation':'contact','referenceGap':round(g,4)})
-        if relations:add(root_instance,'topology','identity',allroles,{'relations':relations},'structure',template='whole.contacts',label='線のつながり',text='この二本の つながりを、お手本と 比べよう。')
+        if relations:add(root_instance,'topology','writing',allroles,{'relations':relations},'structureContact',template='whole.contacts',label='線のつながり（参考）',text='線のつながりを、お手本と 比べよう。')
         for instance in components:
             at=instance['attributes'];el=at['element'];ss=instance['strokes'];n=len(ss)
             if at.get('partial')=='true' or at.get('part'):continue
@@ -147,7 +147,7 @@ def main():
                     for a,b in [('lowerBar','upperBar'),('upperBar','middleBar')]:add(instance,'lengthOrder','beauty',[a,b],{'axis':'horizontal'},'beautyLength',text='下の横線を 長く、まんなかを 短くしてみよう。',template=el+'.length')
             # Each stroke's named type supplies writing candidates, not a mandated printed form.
             for i in (ss if instance is root_instance else []):
-                if paths[i-1].get(NS+'type','') in ('㇚','㇙','㇟','㇖','㇗','㇠'):
+                if any(t and t[0] in '㇁㇂㇃㇆㇈㇉㇚㇙㇟㇖㇠' for t in paths[i-1].get(NS+'type','').split('/')):
                     role='ending-'+str(i);roles[role]={'stroke':i};add(instance,'hookGeometry','writing',[role],category='writingHook',label=str(i)+'画目の終わり',text=str(i)+'画目の 終わりの 向きを、比べよう。',template='hook.geometry')
             hs=[i for i in (ss if instance is root_instance else []) if paths[i-1].get(NS+'type','').startswith('㇐')]
             for i in hs:

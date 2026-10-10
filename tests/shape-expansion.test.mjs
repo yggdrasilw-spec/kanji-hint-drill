@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {configureShapeData,checkCharacterShape,normalizeShapeSettings,rulesForCharacter,analyzeCharacterWriting} from '../shape-rules.mjs';
 import {matchStrokes} from '../shape/matching.mjs';
-import {effectivePolicy,savedShape} from '../shape/policy.mjs';
+import {effectivePolicy,savedShape,ENGINE_VERSION} from '../shape/policy.mjs';
 import {updateRecord,validateProgress} from '../core.mjs';
 const data=JSON.parse(fs.readFileSync(new URL('../data/shape-components.json',import.meta.url))),rules=JSON.parse(fs.readFileSync(new URL('../data/shape-rules.json',import.meta.url)));
 const curriculum=JSON.parse(fs.readFileSync(new URL('../data/curriculum.json',import.meta.url)));
@@ -62,5 +62,5 @@ const record=updateRecord(null,outcome,100);assert.equal(record.stage,1);assert.
 assert.deepEqual(savedShape({engineVersion:'x',shapeResults:[{ruleId:'unknown',status:'executeme',layer:'x'}]}).shapeResults[0].status,'unavailable');
 assert.equal(matchStrokes([[{x:NaN,y:0},{x:2,y:3}]],reference('一')).available,false);
 assert.equal(matchStrokes(Array.from({length:97},()=>reference('一')[0]),reference('一')).available,false);
-fs.writeFileSync(new URL('../data/shape-coverage.json',import.meta.url),JSON.stringify({version:1,engineVersion:'component-engine-1',characters:audit,summary:{characters:audit.length,rules:audit.reduce((s,c)=>s+c.rules.length,0),syntheticReferenceAndTransforms:true,allDetailsComplete:false,identityReviewPending:true,realHandwriting:'not-collected',referenceTiming:{totalMs:Math.round(elapsed),averageMs:elapsed/audit.length}}},null,2)+'\n');
+fs.writeFileSync(new URL('../data/shape-coverage.json',import.meta.url),JSON.stringify({version:1,engineVersion:ENGINE_VERSION,characters:audit,summary:{characters:audit.length,rules:audit.reduce((s,c)=>s+c.rules.length,0),syntheticReferenceAndTransforms:true,allDetailsComplete:false,identityReviewPending:true,realHandwriting:'not-collected',referenceTiming:{totalMs:Math.round(elapsed),averageMs:elapsed/audit.length}}},null,2)+'\n');
 console.log('PASS: all 1026 mappings, transforms, partial strokes, inner-bar localization, retracing/splits, shape-specific length/aspect, writing/beauty/history independence and off policy');
