@@ -7,14 +7,16 @@ let data,session,labels,modelError='',modelReady=false,questions=[],queue=[],que
 let store={version:1,records:{}},settings={grade:1,selections:{},multiple:true,length:10,mode:'write',vertical:true,scopeMode:'characters',characters:[]},storageAvailable=true;
 try{const raw=localStorage.getItem(STORAGE_KEY);if(raw)store=validateProgress(JSON.parse(raw));const saved=JSON.parse(localStorage.getItem(STORAGE_KEY+'-settings')||'null');if(saved&&[1,2,3,4,5,6].includes(+saved.grade)){settings={...settings,...saved};settings.selections=saved.selections&&typeof saved.selections==='object'?saved.selections:{};}}
 catch(e){storageAvailable=false;$('storageMessage').textContent='保存した記録を読み込めませんでした。練習はできますが、記録の保存状態を確認してください。';}
+settings.vertical=true;
 settings.shapeChecks=normalizeShapeSettings(settings.shapeChecks);
+document.body.classList.add('vertical-ui');
 settings.shapeOverrides=sanitizeOverrides(settings.shapeOverrides);
 if(!['characters','units'].includes(settings.scopeMode))settings.scopeMode='characters';
 for(const control of document.querySelectorAll('[data-shape-setting]')){
  const key=control.dataset.shapeSetting;control.value=settings.shapeChecks[key];
  control.addEventListener('change',()=>{settings.shapeChecks=normalizeShapeSettings({...settings.shapeChecks,[key]:control.value});persist();});
 }
-$('resetShapeSettings').onclick=()=>{settings.shapeChecks=normalizeShapeSettings();for(const control of document.querySelectorAll('[data-shape-setting]'))control.value=settings.shapeChecks[control.dataset.shapeSetting];persist();};
+$('resetShapeSettings').onclick=()=>{settings.shapeChecks=normalizeShapeSettings();for(const control of document.querySelectorAll('[data-shape-setting]'))control.value=settings.shapeChecks[control.dataset.shapeSetting];persist();document.querySelector('.shape-settings').dispatchEvent(new CustomEvent('shape-settings-reset',{detail:settings.shapeChecks}));};
 const canvas=$('canvas'),ctx=canvas.getContext('2d');
 function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localStorage.setItem(STORAGE_KEY+'-settings',JSON.stringify(settings));}catch(e){storageAvailable=false;$('storageMessage').textContent='記録を保存できません。学習後に「記録を書き出す」で保存してください。';}}
 function show(view){reader?.stop();shapeFocus=null;lastShape=null;activeShapePolicy=null;$('shapeFocus').replaceChildren();for(const id of ['setupView','drillView','recordView','resultView'])$(id).hidden=id!==view;$('setupTab').classList.toggle('active',view==='setupView');$('progressTab').classList.toggle('active',view==='recordView');window.scrollTo({top:0,behavior:'smooth'});}
@@ -157,15 +159,16 @@ function renderShapeFocus(){
  }
 }
 function showShapeIssues(shape){
- const issues=shape.checks.filter(c=>!['pass','skipped','unavailable'].includes(c.status));
- const selected=issues.find(c=>c.id===shape.ruleId&&c.focus)||issues.find(c=>c.focus)||issues[0];
- shapeFocus=selected?.focus||shape.focus||null;const panel=$('shapeIssues');panel.replaceChildren();panel.hidden=issues.length<2;
- for(const issue of issues){
-  const button=document.createElement('button');button.type='button';button.textContent=issue.label;button.setAttribute('aria-pressed',String(issue===selected));
-  button.onclick=()=>{shapeFocus=issue.focus||null;for(const b of panel.children)b.setAttribute('aria-pressed',String(b===button));renderShapeFocus();$('shapeIssueText').textContent=issue.text;};panel.append(button);
- }
- $('shapeIssueText').textContent=selected?.text||'';renderShapeFocus();return issues.map(c=>c.text).join('\n');
+ const issues=[...shape.checks,...(shape.writingChecks||[]),...(shape.beautyChecks||[])].filter(c=>!['pass','skipped','unavailable'].includes(c.status));
+ let selected=issues.find(c=>c.id===shape.ruleId&&c.focus)||issues.find(c=>c.focus)||issues[0],page=0;
+ const panel=$('shapeIssues');panel.hidden=issues.length<2;
+ const selectIssue=issue=>{selected=issue;shapeFocus=issue?.focus||null;$('shapeIssueText').textContent=issue?(issue.adviceOnly?'見比べの参考：':'')+issue.text+(issue.focus?'':'（場所を特定できませんでした。字全体を見比べよう。）'):'';renderShapeFocus();};
+ const renderPage=()=>{panel.replaceChildren();for(const issue of issues.slice(page*4,page*4+4)){const button=document.createElement('button');button.type='button';button.textContent=issue.label;button.setAttribute('aria-pressed',String(issue===selected));button.onclick=()=>{selectIssue(issue);renderPage();};panel.append(button);}
+  if(issues.length>4)for(const [label,to] of [['前の箇所',page-1],['次の箇所',page+1]]){const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=to<0||to>=Math.ceil(issues.length/4);button.onclick=()=>{page=to;selectIssue(issues[page*4]);renderPage();};panel.append(button);}
+ };
+ selectIssue(selected);renderPage();return issues.length?'見比べる候補が '+issues.length+'箇所 あります。赤い線の説明を 読もう。':'';
 }
+
 async function check(){if(reader?.active()){reader.judge();return;}
  if(!strokes.length||judged||busy)return;
  if(!modelReady){offerConfirmation('自動判定が使えないため、答えのお手本と比べて確認しよう。');return;}
@@ -184,11 +187,13 @@ async function check(){if(reader?.active()){reader.judge();return;}
     offerConfirmation('「'+current.char+'」に見えました。\n'+(showShapeIssues(shape)||shape.text));return;
    }
    const writing=shape.writingChecks?.filter(c=>!['pass','skipped','unavailable'].includes(c.status))||[];
-   if(writing.length){analysis.type=writing[0].kind;analysis.text=writing.map(c=>c.text).join('\n');}
+   const practice=writing.filter(c=>!c.adviceOnly),referenceNotes=writing.filter(c=>c.adviceOnly);
+   if(practice.length&&analysis.type==='good'){analysis.type=practice[0].kind;analysis.text='書き方の練習で '+practice.length+'箇所、確かめよう。';}
+   const referenceText=referenceNotes.length?'\n参考の指摘：'+referenceNotes.length+'箇所（記録とは別）':'';
    const beauty=shape.beautyChecks?.filter(c=>c.status!=='pass')||[];
-   const beautyText=beauty.length?'\n美文字のヒント：\n'+beauty.map(c=>c.text).join('\n'):'';
+   const beautyText=beauty.length?'\n美文字のヒントが '+beauty.length+'箇所 あります。':'';
    const issues=[...writing,...beauty];if(issues.length)showShapeIssues({checks:issues,focus:issues[0].focus,ruleId:issues[0].id});
-   feedback(`正解！${hints||answerSeen?' ヒントを使って思い出せたね。':' 自分の力で書けたね。'}\n${analysis.text}${beautyText}`,analysis.type==='good'?'good':'review');
+   feedback(`正解！${hints||answerSeen?' ヒントを使って思い出せたね。':' 自分の力で書けたね。'}\n${analysis.text}${referenceText}${beautyText}`,analysis.type==='good'?'good':'review');
    // Correct character with a stroke problem needs review; it is not counted as fluent mastery.
    const outcome={type:'correct',hints,answerSeen,reason:analysis.type==='good'?'':analysis.type,recognized,needsReview:analysis.type!=='good',beautyNotes:beauty.map(c=>c.id)};
    record(outcome);
@@ -231,7 +236,7 @@ $('export').onclick=()=>{const blob=new Blob([JSON.stringify(store,null,2)],{typ
 $('import').onchange=async()=>{try{const file=$('import').files[0];if(!file)return;if(file.size>5e6)throw Error('記録ファイルが大きすぎます。');const incoming=validateProgress(JSON.parse(await file.text()));for(const [id,r] of Object.entries(incoming.records))if(!store.records[id]||(r.lastSeen||0)>(store.records[id].lastSeen||0))store.records[id]=r;persist();renderRecords();$('storageMessage').textContent='記録を読み込みました。新しい記録を優先してまとめています。';}catch(e){$('storageMessage').textContent='読み込めませんでした：'+e.message;}finally{$('import').value='';}};
 try{
  [data,kana]=await Promise.all([fetchJSON('./data/curriculum.json'),fetchJSON('./data/kana.json')]);
- try{const [components,rules]=await Promise.all([fetchJSON('./data/shape-components.json'),fetchJSON('./data/shape-rules.json')]);configureShapeData(components,rules);$('shapeCoverage').textContent='1,026字の共通評価・部品評価を利用できます。新しい骨組み規則は資料・目視レビュー待ちのため、問題を見つけた場合は自己確認に回します。実筆跡での校正は未実施です。';}catch(e){$('shapeCoverage').textContent='追加の字形データを読み込めません。文字認識と従来の確認で練習できます。';console.warn(e);}
+ try{const [components,rules]=await Promise.all([fetchJSON('./data/shape-components.json'),fetchJSON('./data/shape-rules.json')]);configureShapeData(components,rules);$('shapeCoverage').textContent='1,026字・9,662画の始点／終点／経路／終わりの向き／長さ、47,138組の線の関係、5,567部品を棚卸し済みです。手本の特徴と教育上の必須性は別です。筆圧・止める力は測定せず、実筆跡での校正は未実施です。';}catch(e){$('shapeCoverage').textContent='追加の字形データを読み込めません。文字認識と従来の確認で練習できます。';console.warn(e);}
  setupCharacterShapeSettings();
  reader=createReading({$,kana,getCurrent:()=>current,getState:()=>({judged,busy,strokes,drawing,hints,answerSeen}),setStrokes:s=>{strokes=s;redraw();},setBusy:value=>{busy=value;redraw();},recognize,record,feedback});reader.setQuestions(()=>questions);
  if(!['write','read'].includes(settings.mode))settings.mode='write';
@@ -245,13 +250,19 @@ try{
 }catch(e){$('fatal').hidden=false;$('fatal').textContent='漢字のデータを読み込めません。HTTPでアプリを開き直してください。';console.error(e);}
 
 function setupCharacterShapeSettings(){
+ let rulePage=0;const filter=$('shapeRuleCategory');
  const select=$('shapeCharacter');for(const char of Object.keys(data.glyphs).sort((a,b)=>data.glyphs[a].grade-data.glyphs[b].grade||a.codePointAt(0)-b.codePointAt(0))){const o=document.createElement('option');o.value=char;o.textContent=char+'（'+data.glyphs[char].grade+'年）';select.append(o);}
- const names={protrusion:'鉄：突き出し',containment:'鉄：突き抜けない',connection:'鉄：線の接続',rise:'鉄：払い上げ',sweepEnd:'鉄：右払いの終わり',beautyParallel:'横線の平行',beautySlope:'横線の右上がり',structure:'骨組み・線の過不足',structureContact:'線の接触（参考）',internalBars:'囲みの中の横線',identityLength:'字を区別する長短',identityExtent:'字を区別する突出',compactEnding:'短い終画',writingHook:'はねの形',writingSweep:'はらいの形',writingRise:'偏の払い上げ',writingBounds:'偏の縦線の上下',writingContact:'偏の線の接続',beautyLength:'美文字：線の長短',beautyAspect:'美文字：部品の幅',beautySpacing:'美文字：目の間隔'};
+ const names={writingPosition:'始点・終点の位置',writingPath:'線の経路・折れ曲がり',writingFinish:'終わりの向き',writingCrossing:'交差・突き出す長さ',writingSeparation:'線の離れ',beautyLayout:'全部品の位置・大きさ',beautyParallel:'横線の平行',beautySlope:'横線の右上がり',structure:'骨組み・線の過不足',structureContact:'線の接触（参考）',internalBars:'囲みの中の横線',identityLength:'字を区別する長短',identityExtent:'字を区別する突出',compactEnding:'短い終画',writingHook:'はねの形',writingSweep:'はらいの形',writingRise:'偏の払い上げ',writingBounds:'偏の縦線の上下',writingContact:'偏の線の接続',beautyLength:'美文字：線の長短',beautyAspect:'美文字：部品の幅',beautySpacing:'美文字：目の間隔'};
  function render(){const char=select.value,box=$('shapeCharacterRules');box.replaceChildren();const own=settings.shapeOverrides[char]||{categories:{},rules:{}};
   const add=(key,label,type,category)=>{const row=document.createElement('label'),title=document.createElement('span');title.textContent=label;const control=document.createElement('select');for(const [v,t] of [['','共通設定を使う'],['off','見ない'],['relaxed','ゆるめ'],['normal','標準'],['strict','厳しめ']]){const o=document.createElement('option');o.value=v;o.textContent=t;control.append(o);}control.value=own[type][key]||'';control.dataset.category=category;if(type==='rules')control.dataset.ruleId=key;const note=document.createElement('small');const actual=()=>{const global=settings.shapeChecks[category],value=global==='off'?'off':own.rules[type==='rules'?key:'']||own.categories[category]||global;note.textContent='実効値：'+({off:'見ない',relaxed:'ゆるめ',normal:'標準',strict:'厳しめ'}[value]||'見ない')+(global==='off'?'（共通設定が優先）':own[type][key]?'（この字の調整）':'（継承）');};actual();control.onchange=()=>{if(control.value)own[type][key]=control.value;else delete own[type][key];settings.shapeOverrides[char]=own;persist();actual();};row.append(title,control,note);box.append(row);};
-  const applicable=new Set(rulesForCharacter(char).map(r=>r.category));for(const [key,label] of Object.entries(names))if(applicable.has(key))add(key,label,'categories',key);
-  for(const rule of rulesForCharacter(char))add(rule.id,rule.label+'：'+rule.kind,'rules',rule.category);
+  const all=rulesForCharacter(char),applicable=new Set(all.map(r=>r.category)),old=filter.value;
+  filter.replaceChildren(...[...applicable].map(key=>new Option(names[key]||key,key)));filter.value=applicable.has(old)?old:applicable.has('writingPosition')?'writingPosition':[...applicable][0];
+  const chosen=filter.value,rows=all.filter(r=>r.category===chosen),pages=Math.max(1,Math.ceil(rows.length/8));rulePage=Math.min(rulePage,pages-1);
+  if(chosen)add(chosen,names[chosen]||chosen,'categories',chosen);
+  for(const rule of rows.slice(rulePage*8,rulePage*8+8))add(rule.id,rule.label+'：'+rule.text,'rules',rule.category);
+  const pager=$('shapeRulePager');pager.replaceChildren();for(const [text,to] of [['前へ',rulePage-1],[(rulePage+1)+'／'+pages+'頁（'+rows.length+'箇所）',rulePage],['次へ',rulePage+1]]){const button=document.createElement('button');button.type='button';button.textContent=text;button.disabled=to===rulePage||to<0||to>=pages;button.onclick=()=>{rulePage=to;render();};pager.append(button);}
+  $('shapeCharacterReview').href='shape-review.html?char='+encodeURIComponent(char)+'&category='+encodeURIComponent(chosen);
   $('resetCharacterShape').onclick=()=>{delete settings.shapeOverrides[char];persist();render();};
  }
- select.onchange=render;render();for(const control of document.querySelectorAll('[data-shape-setting]'))control.addEventListener('change',render);$('resetShapeSettings').addEventListener('click',render);
+ filter.onchange=()=>{rulePage=0;render();};select.onchange=()=>{rulePage=0;render();};render();for(const control of document.querySelectorAll('[data-shape-setting]'))control.addEventListener('change',render);$('resetShapeSettings').addEventListener('click',render);
 }

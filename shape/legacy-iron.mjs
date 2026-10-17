@@ -131,7 +131,7 @@ export function checkCharacterShape(char,strokes,expected,settings,levels={}){
   const start=rule.end==='finish'?a.points.at(-1):a.points[0],focus=protrusionFocus(start,b.points,a.index+1,b.index+1);
   if(rule.kind==='connection'){
    const gap=Math.hypot(start.x-focus.acrossPoint.x,start.y-focus.acrossPoint.y)/length;
-   const maximum={relaxed:.23,normal:.18,strict:.12}[level],band=.015;
+   const maximum={relaxed:.32,normal:.25,strict:.12}[level],band=.015;
    checks.push({...item,status:gap<=maximum-band?'pass':gap>maximum+band?'fail':'uncertain',gap,maximum,focus});continue;
   }
   const offset=sub(start,b.points[0]);
@@ -141,7 +141,7 @@ export function checkCharacterShape(char,strokes,expected,settings,levels={}){
    // Measure against the actual drawn curve near the endpoint, not only its
    // straight chord. Positive overshoot points outside the metal radical.
    const offset=sub(start,focus.acrossPoint),overshoot=cross(h,offset)/(length*length)*(rule.side==='above'?-1:1);
-   const maximum={relaxed:.13,normal:.07,strict:.04}[level],band=.012;
+   const maximum={relaxed:.22,normal:.16,strict:.04}[level],band=.012;
    checks.push({...item,status:overshoot<=maximum-band?'pass':overshoot>maximum+band?'fail':'uncertain',overshoot,maximum,focus});continue;
   }
   // Screen y grows downwards: positive extension means above the horizontal.

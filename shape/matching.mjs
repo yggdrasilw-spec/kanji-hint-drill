@@ -44,5 +44,5 @@ export function matchStrokes(strokes,expected){
  }
  const matches=map.map((i,j)=>{if(i===null)return null;const v=virtual[i],ns=resample(v.points,32).map(transform),forward=error(ns,refs[j])<=error([...ns].reverse(),refs[j]);const alternatives=costs.map((row,k)=>k===i?Infinity:row[j]);return {points:forward?v.points:[...v.points].reverse(),rawPoints:v.points,indices:v.indices,error:costs[i][j],stable:costs[i][j]<20&&Math.min(...alternatives)>costs[i][j]+1.2};});
  const used=new Set(map.filter(i=>i!==null));const extras=virtual.filter((_,i)=>!used.has(i));const present=matches.filter(Boolean),mean=present.reduce((s,m)=>s+m.error,0)/(present.length||1);
- return {available:present.length>=Math.min(2,expected.length)&&mean<16,reason:'unstable-correspondence',matches,extras,missing:matches.flatMap((m,j)=>m?[]:[j]),duplicates,virtual,scale:b.size,mean};
+ return {available:present.length>=Math.min(2,expected.length)&&mean<16,reason:'unstable-correspondence',matches,extras,missing:matches.flatMap((m,j)=>m?[]:[j]),duplicates,virtual,scale:b.size,mean,toReference:transform};
 }

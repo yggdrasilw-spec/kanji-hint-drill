@@ -1,3 +1,4 @@
+import {evaluateDetail} from './detail-geometry.mjs';
 import {resample} from '../core.mjs';
 import {bounds,sub,dot,cross,norm,dist,nearest,lineDistance,mainRun,frame,local,world,projectedLength,focus,angle,boxAtY,intersections} from './geometry.mjs';
 const limits=(level,values)=>values[{relaxed:0,normal:1,strict:2}[level]];
@@ -6,7 +7,7 @@ const unavailable=reason=>({status:'unavailable',confidence:'none',reasonCode:re
 const unsure=reason=>({status:'uncertain',confidence:'low',reasonCode:reason});
 function hookTurn(points,scale){
  const ps=resample(points,101),before=sub(ps[85],ps[70]),tails=[1,2,3,5,8,12].map(n=>sub(ps[100],ps[100-n])).filter(v=>norm(v)>=scale*.006);
- return {ps,turn:norm(before)<scale*.008||!tails.length?null:Math.max(...tails.map(last=>Math.abs(angle(before,last))))};
+ return {ps,ending:tails[0],turn:norm(before)<scale*.008||!tails.length?null:Math.max(...tails.map(last=>Math.abs(angle(before,last))))};
 }
 function componentBox(ctx){
  const wall=ctx.get('leftWall'),roof=ctx.get('roof'),bottom=ctx.get('bottom');if(!wall?.stable||!roof?.stable||(ctx.rule.kind==='internalBars'&&!bottom?.stable))return null;
@@ -41,6 +42,7 @@ function barsInBox(ctx,box){
 }
 export function evaluateRule(ctx){
  const {rule,level,match}=ctx,p=rule.parameters||{},ms=rule.roles.map(role=>ctx.get(role)),available=ms.filter(Boolean),indices=available.flatMap(m=>m.indices),foc=()=>focus(available.map(m=>m.points),indices);
+ if(rule.kind.startsWith('detail'))return evaluateDetail(ctx);
  if(!match.available)return unavailable(match.reason);
  if(rule.kind==='strokePresence'){
   const missing=match.missing,extra=match.extras;const stable=available.filter(m=>m.stable);
@@ -56,7 +58,7 @@ export function evaluateRule(ctx){
  }
  if(rule.kind==='topology'){
   const problems=[],borderline=[];let ambiguous=false;for(const pair of p.relations){const a=ctx.get(pair.a),b=ctx.get(pair.b);if(!a?.stable||!b?.stable){ambiguous=true;continue;}
-   const gap=lineDistance(a.points,b.points)/match.scale,max=limits(level,[.085,.065,.045]);if(gap>max+.012)problems.push({a,b,gap,max,pair});else if(gap>max-.012)borderline.push({a,b,gap,max,pair});
+   const gap=lineDistance(a.points,b.points)/match.scale,max=limits(level,[.14,.10,.065]);if(gap>max+.012)problems.push({a,b,gap,max,pair});else if(gap>max-.012)borderline.push({a,b,gap,max,pair});
   }
   const issue=problems[0]||borderline[0],status=problems.length?'fail':borderline.length||ambiguous?'uncertain':'pass';
   return {status,confidence:status==='fail'?'high':status==='uncertain'?'low':'high',reasonCode:issue?'contact-gap':ambiguous?'ambiguous-contact-correspondence':'contact-signature',observed:issue?{gap:issue.gap}:undefined,expected:issue?{maximum:issue.max}:undefined,focus:issue?focus([issue.a.points,issue.b.points],[...issue.a.indices,...issue.b.indices]):null,text:issue?'色のついた 二本の つながりを、お手本と 比べよう。':ambiguous?'線の対応が はっきりしませんでした。字全体を、お手本と 比べよう。':rule.text};
@@ -86,13 +88,13 @@ export function evaluateRule(ctx){
  if(['protrusion','boundedEndpoint','contact','crossing','separation'].includes(rule.kind)){
   if(rule.kind==='contact'||rule.kind==='separation'){
    const length=dist(b.points[0],b.points.at(-1));if(length<match.scale*.04)return unsure('short-contact-reference');
-   const endpoint=p.end==='finish'||p.end==='end'||p.side==='below'?points.at(-1):points[0],near=nearest(endpoint,b.points),gap=near.distance/length;
-   const threshold=limits(level,rule.kind==='contact'?[.22,.17,.12]:[.015,.035,.055]),status=rule.kind==='contact'?(gap>threshold+.015?'fail':gap>threshold-.015?'uncertain':'pass'):(gap<threshold-.01?'fail':gap<threshold+.01?'uncertain':'pass');
+   const endpoint=p.end==='finish'||p.end==='end'||p.side==='below'?points.at(-1):points[0],near=nearest(endpoint,b.points),gap=near.distance/(rule.kind==='contact'?match.scale:length);
+   const threshold=limits(level,rule.kind==='contact'?[.10,.07,.045]:[.015,.035,.055]),status=rule.kind==='contact'?(gap>threshold+.015?'fail':gap>threshold-.015?'uncertain':'pass'):(gap<threshold-.01?'fail':gap<threshold+.01?'uncertain':'pass');
    return {status,confidence:status==='uncertain'?'low':'high',reasonCode:rule.kind==='contact'?'endpoint-contact':'required-gap',observed:{gap},expected:rule.kind==='contact'?{maximum:threshold}:{minimum:threshold},focus:focus([],indices,[endpoint,near.point],null,'endpoint-pair')};
   }
   const base=frame(b.points);if(!base)return unsure('unstable-reference-axis');const endpoint=p.side==='below'?points.at(-1):points[0],near=nearest(endpoint,b.points),signed=dot(sub(endpoint,near.point),base.y)/base.length*(p.side==='below'?1:-1),gap=near.distance/base.length;
   let status,reason,expected;if(rule.kind==='crossing'){status=intersections(points,b.points).length?'pass':'uncertain';reason='crossing';}
-  else if(rule.kind==='boundedEndpoint'){const max=limits(level,[.16,.10,.065]);status=signed>max+.018?'fail':signed>max-.018?'uncertain':'pass';reason='bounded-endpoint';expected={maximum:max};}
+  else if(rule.kind==='boundedEndpoint'){const max=limits(level,[.22,.16,.065]);status=signed>max+.018?'fail':signed>max-.018?'uncertain':'pass';reason='bounded-endpoint';expected={maximum:max};}
   else{const min=limits(level,[.03,.07,.12]);status=signed<min-.018?'fail':signed<min+.018?'uncertain':intersections(points,b.points).length?'pass':'uncertain';reason='required-protrusion';expected={minimum:min};}
   return {status,confidence:status==='uncertain'?'low':'high',reasonCode:reason,observed:{extension:signed,gap},expected,focus:focus([],indices,[endpoint,near.point],null,'endpoint-pair')};
  }
@@ -103,17 +105,24 @@ export function evaluateRule(ctx){
  }
  if(rule.kind==='risingStroke'||rule.kind==='sweepGeometry'){
   const base=frame(b.points);if(!base)return unsure('unstable-reference-axis');const raw=rule.kind==='risingStroke'?a.rawPoints:points,ps=resample(raw,41),v=sub(ps.at(-1),ps[rule.kind==='risingStroke'?0:30]);if(norm(v)<base.length*.04)return unsure('short-ending');const theta=-angle(base.x,v),min=limits(level,[0,5,10]);
+  if(rule.kind==='sweepGeometry'&&ctx.expected){
+   const referenceLine=ctx.expected[ctx.instance.roles[rule.roles[0]]?.stroke-1],referenceBase=frame(ctx.expected[ctx.instance.roles[rule.roles[1]]?.stroke-1]||[]);
+   if(referenceLine&&referenceBase){const ref=resample(referenceLine,41),refTheta=-angle(referenceBase.x,sub(ref.at(-1),ref[30])),delta=Math.abs((theta-refTheta+540)%360-180),maximum=limits(level,[40,30,20]);
+    return {status:delta>maximum+3?'fail':delta>maximum-3?'uncertain':'pass',confidence:'medium',reasonCode:'ending-direction',observed:{angle:theta,difference:delta},expected:{angle:refTheta,maximumDifference:maximum},focus:foc()};
+   }
+  }
   return {status:rule.kind==='risingStroke'?(theta<min-2?'fail':theta<min+2?'uncertain':'pass'):(theta<-75||theta>20?'fail':'pass'),confidence:'medium',reasonCode:'ending-direction',observed:{angle:theta},expected:{minimum:min},focus:foc()};
  }
  if(rule.kind==='hookGeometry'){
   // Measure the written direction and several short tails. A fixed final 12.5%
   // averages a small hook together with its much longer stem.
   const reference=ctx.expected?.[ctx.instance?.roles[rule.roles[0]]?.stroke-1];
-  let min=limits(level,[20,30,42]);
-  if(reference){const ref=hookTurn(reference,bounds(ctx.expected).size);if(ref.turn===null||ref.turn<20)return unavailable('reference-hook-not-established');min=Math.min(min,ref.turn*limits(level,[.5,.65,.8]));}
-  const {ps,turn}=hookTurn(a.rawPoints,match.scale),f=focus([ps.slice(70)],a.indices,[ps[70],ps.at(-1)],null,'line-group');
+  let min=limits(level,[20,30,42]),referenceEnding;
+  if(reference){const ref=hookTurn(reference,bounds(ctx.expected).size);if(ref.turn===null||ref.turn<20)return unavailable('reference-hook-not-established');min=Math.min(min,ref.turn*limits(level,[.5,.65,.8]));referenceEnding=ref.ending;}
+  const {ps,turn,ending}=hookTurn(a.rawPoints,match.scale),f=focus([ps.slice(70)],a.indices,[ps[70],ps.at(-1)],null,'line-group');
   if(turn===null)return {...unsure('short-hook'),focus:f};
-  return {status:turn<min-5?'fail':turn<min+5?'uncertain':'pass',confidence:'medium',reasonCode:'ending-turn',observed:{turn},expected:{minimum:min},focus:f};
+  const reversed=referenceEnding&&ending&&Math.abs(angle(referenceEnding,ending))>110;
+  return {status:reversed||turn<min-5?'fail':turn<min+5?'uncertain':'pass',confidence:'medium',reasonCode:reversed?'hook-ending-direction':'ending-turn',observed:{turn},expected:{minimum:min},focus:f};
  }
  return unavailable('checker-not-implemented');
 }
