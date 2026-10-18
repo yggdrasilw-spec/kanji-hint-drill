@@ -1,6 +1,6 @@
-export const ENGINE_VERSION='component-engine-3';
+export const ENGINE_VERSION='component-engine-5';
 export const LEVELS=['off','relaxed','normal','strict'];
-export const EXTRA_DEFAULTS=Object.freeze({writingPosition:'relaxed',writingPath:'relaxed',writingFinish:'off',writingCrossing:'relaxed',writingSeparation:'relaxed',beautyLayout:'off',structure:'normal',internalBars:'normal',identityLength:'normal',identityExtent:'normal',compactEnding:'off',writingHook:'off',writingSweep:'off',writingRise:'off',writingBounds:'off',writingContact:'relaxed',beautyLength:'off',beautyAspect:'off',beautySpacing:'off'});
+export const EXTRA_DEFAULTS=Object.freeze({beautyCenter:'off',beautySymmetry:'off',writingPosition:'relaxed',writingPath:'relaxed',writingFinish:'off',writingCrossing:'relaxed',writingSeparation:'relaxed',beautyLayout:'off',structure:'normal',internalBars:'normal',identityLength:'normal',identityExtent:'normal',compactEnding:'off',writingHook:'off',writingSweep:'off',writingRise:'off',writingBounds:'off',writingContact:'relaxed',beautyLength:'off',beautyAspect:'off',beautySpacing:'off'});
 export function sanitizeOverrides(value){
  const out={};if(!value||typeof value!=='object'||Array.isArray(value))return out;
  for(const [char,entry] of Object.entries(value).slice(0,1026)){

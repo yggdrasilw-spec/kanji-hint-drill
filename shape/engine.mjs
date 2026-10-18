@@ -4,6 +4,8 @@ import {focus} from './geometry.mjs';
 import {matchStrokes} from './matching.mjs';
 import {evaluateRule} from './checks.mjs';
 import {ENGINE_VERSION,effectivePolicy,snapshot,aggregate} from './policy.mjs';
+import {childFeedback,wholeCanvasFeedback} from './child-feedback.mjs';
+import {centerBalanceFeedback} from './center-balance.mjs';
 import {hasHook} from './stroke-types.mjs';
 let componentData=null,ruleData=null;const ruleCache=new Map();
 export function configureShapeData(components,rules){
@@ -62,7 +64,8 @@ export function evaluateCharacter(char,strokes,expected,settings,options={}){
   const gated=pending&&mode==='normal'&&measured.status==='fail'?{...measured,status:'uncertain',candidateStatus:'fail',reasonCode:'pending-review:'+measured.reasonCode}:measured;
   const locatedFocus=gated.focus||(['fail','uncertain'].includes(gated.status)?focus(rule.roles.map(get).filter(Boolean).map(m=>m.points),rule.roles.map(get).filter(Boolean).flatMap(m=>m.indices)):null);
   if(gated.status==='uncertain'&&!locatedFocus)gated.text=rule.label+'の 場所を特定できませんでした。字全体を お手本と 比べよう。';
-  return {...result,...gated,focus:locatedFocus,actualStrokeIds:(locatedFocus?.actualIndices||[]).map(i=>'stroke-'+(i+1))};
+  const child=childFeedback({...result,...gated},ctx);
+  return {...result,...gated,...child,focus:locatedFocus,actualStrokeIds:(locatedFocus?.actualIndices||[]).map(i=>'stroke-'+(i+1))};
  });
  // A located internal-bar issue supersedes the generic missing-stroke message.
  const located=results.filter(r=>r.kind==='internalBars'&&['fail','uncertain'].includes(r.status)&&r.observed?.count!==r.expected?.count);
@@ -73,5 +76,10 @@ export function evaluateCharacter(char,strokes,expected,settings,options={}){
  const layers={identity:aggregate(results,'identity'),writing:aggregate(results,'writing'),beauty:aggregate(results,'beauty')},status=layers.identity==='fail'?'fail':layers.identity==='uncertain'?'uncertain':layers.identity==='pass'?'pass':layers.identity;
  const inventoryComplete=rules.filter(r=>r.kind.startsWith('detail')).length===entry.strokeTypes.length*5+entry.strokeTypes.length*(entry.strokeTypes.length-1)/2+entry.components.length-1;
  const issues=checks.filter(r=>['fail','uncertain'].includes(r.status));const issue=issues.find(r=>r.status==='fail'&&r.focus)||issues.find(r=>r.focus)||issues[0];
- return {status,layers,checks,writingChecks,beautyChecks,results,focus:issue?.focus,ruleId:issue?.id,kind:issue?.kind,text:issue?.text,engineVersion:ENGINE_VERSION,ruleSetVersion:componentData.ruleSetVersion+'+details-1',policySnapshot,coverage:{inventory:detailCatalog.characters[char]?{strokes:entry.strokeTypes.length,pairs:entry.strokeTypes.length*(entry.strokeTypes.length-1)/2,components:entry.components.length,complete:inventoryComplete}:null,humanReview:entry.review.human,realHandwriting:entry.review.realHandwriting,incompleteReasons:entry.incompleteReasons.filter(reason=>!inventoryComplete||reason!=='not-all-character-specific-details-covered')}};
+ const displayPolicy=effectivePolicy(char,{id:'display.whole',category:'beautyLayout'},settings,options.overrides||{});
+ const centerPolicy=effectivePolicy(char,{id:'display.balance.axis',category:'beautyCenter'},settings,options.overrides||{}),symmetryPolicy=effectivePolicy(char,{id:'display.balance.arms',category:'beautySymmetry'},settings,options.overrides||{});
+ const balanceHints=centerBalanceFeedback(char,strokes,expected||[],match,{center:centerPolicy.level,symmetry:symmetryPolicy.level});
+ const wholeHints=wholeCanvasFeedback(strokes,expected||[],displayPolicy.level).filter(row=>!balanceHints.some(h=>h.category==='beautyCenter')||row.id!=='display.whole.center');
+ const presentationHints=[...balanceHints,...wholeHints];
+ return {status,layers,checks,writingChecks,beautyChecks,presentationHints,results,focus:issue?.focus,ruleId:issue?.id,kind:issue?.kind,text:issue?.text,engineVersion:ENGINE_VERSION,ruleSetVersion:componentData.ruleSetVersion+'+details-1',policySnapshot,coverage:{inventory:detailCatalog.characters[char]?{strokes:entry.strokeTypes.length,pairs:entry.strokeTypes.length*(entry.strokeTypes.length-1)/2,components:entry.components.length,complete:inventoryComplete}:null,humanReview:entry.review.human,realHandwriting:entry.review.realHandwriting,incompleteReasons:entry.incompleteReasons.filter(reason=>!inventoryComplete||reason!=='not-all-character-specific-details-covered')}};
 }

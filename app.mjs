@@ -1,4 +1,5 @@
 import {STORAGE_KEY,selectScope,questionsFor,gradeCharacters,selectedCharacters,questionsForCharacters,updateRecord,buildQueue,summaryFor,validateProgress} from './core.mjs';
+import {balancedReference} from './shape/center-balance.mjs';
 import {createReading,readingQuestions} from './reading.mjs';
 import {normalizeShapeSettings,checkCharacterShape,configureShapeData,analyzeCharacterWriting,sanitizeOverrides,DEFAULT_SHAPE_SETTINGS,rulesForCharacter} from './shape-rules.mjs';
 const $=id=>document.getElementById(id);
@@ -8,6 +9,10 @@ let store={version:1,records:{}},settings={grade:1,selections:{},multiple:true,l
 try{const raw=localStorage.getItem(STORAGE_KEY);if(raw)store=validateProgress(JSON.parse(raw));const saved=JSON.parse(localStorage.getItem(STORAGE_KEY+'-settings')||'null');if(saved&&[1,2,3,4,5,6].includes(+saved.grade)){settings={...settings,...saved};settings.selections=saved.selections&&typeof saved.selections==='object'?saved.selections:{};}}
 catch(e){storageAvailable=false;$('storageMessage').textContent='保存した記録を読み込めませんでした。練習はできますが、記録の保存状態を確認してください。';}
 settings.vertical=true;
+settings.hand=settings.hand==='left'?'left':'right';
+function renderHand(){document.body.dataset.hand=settings.hand;const left=settings.hand==='left';$('handToggle').textContent=left?'左手でかく':'右手でかく';$('handToggle').setAttribute('aria-pressed',String(left));$('handToggle').setAttribute('aria-label',left?'右利きに切り替える':'左利きに切り替える');}
+renderHand();
+$('handToggle').onclick=()=>{settings.hand=settings.hand==='left'?'right':'left';renderHand();persist();};
 settings.shapeChecks=normalizeShapeSettings(settings.shapeChecks);
 document.body.classList.add('vertical-ui');
 settings.shapeOverrides=sanitizeOverrides(settings.shapeOverrides);
@@ -101,9 +106,9 @@ function renderGuide(all=false){
  $('guide').replaceChildren();const paths=data.glyphs[current.char].paths;
  paths.slice(0,all?paths.length:hints).forEach((d,i)=>{const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);if(all){p.style.stroke=i===hints-1?'#d47637':'#d4a872';p.style.opacity='.7';}$('guide').append(p);if(all){const len=p.getTotalLength();p.style.strokeDasharray=String(len);p.animate([{strokeDashoffset:len},{strokeDashoffset:0}],{duration:220,delay:i*220,fill:'both'});const pt=p.getPointAtLength(0),n=document.createElementNS('http://www.w3.org/2000/svg','text');n.setAttribute('x',String(Math.max(3,pt.x-5)));n.setAttribute('y',String(Math.max(7,pt.y-3)));n.style.fill='#a26028';n.style.stroke='none';n.style.fontSize='6px';n.textContent=i+1;$('guide').append(n);}});
  const hintCount=data.glyphs[current.char].paths.length;$('hint').disabled=hints>=hintCount||judged||busy;
- $('hint').querySelector('span:nth-child(2)').firstChild.textContent=hints===0?'1画目を見せて':hints>=hintCount?'すべての画を表示中':`${hints+1}画目も見せて`;
+ $('hint').querySelector('span:nth-child(2)').firstChild.textContent=hints===0?'1かくめを みせて':hints>=hintCount?'ぜんぶ みせたよ':`${hints+1}かくめも みせて`;
 }
-function referenceStrokes(){return data.glyphs[current.char].paths.map(d=>{const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);const len=p.getTotalLength();return Array.from({length:32},(_,i)=>{const pt=p.getPointAtLength(i*len/31);return{x:pt.x,y:pt.y};});});}
+function referenceStrokes(char=current.char){return data.glyphs[char].paths.map(d=>{const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);const len=p.getTotalLength();return Array.from({length:32},(_,i)=>{const pt=p.getPointAtLength(i*len/31);return{x:pt.x,y:pt.y};});});}
 function begin(){
  refreshScope();if(!questions.length)return;queue=buildQueue(questions,store.records,+settings.length);queueLimit=queue.length+4;queueIndex=0;results=[];show('drillView');loadQuestion();
 }
@@ -162,45 +167,45 @@ function showShapeIssues(shape){
  const issues=[...shape.checks,...(shape.writingChecks||[]),...(shape.beautyChecks||[])].filter(c=>!['pass','skipped','unavailable'].includes(c.status));
  let selected=issues.find(c=>c.id===shape.ruleId&&c.focus)||issues.find(c=>c.focus)||issues[0],page=0;
  const panel=$('shapeIssues');panel.hidden=issues.length<2;
- const selectIssue=issue=>{selected=issue;shapeFocus=issue?.focus||null;$('shapeIssueText').textContent=issue?(issue.adviceOnly?'見比べの参考：':'')+issue.text+(issue.focus?'':'（場所を特定できませんでした。字全体を見比べよう。）'):'';renderShapeFocus();};
- const renderPage=()=>{panel.replaceChildren();for(const issue of issues.slice(page*4,page*4+4)){const button=document.createElement('button');button.type='button';button.textContent=issue.label;button.setAttribute('aria-pressed',String(issue===selected));button.onclick=()=>{selectIssue(issue);renderPage();};panel.append(button);}
-  if(issues.length>4)for(const [label,to] of [['前の箇所',page-1],['次の箇所',page+1]]){const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=to<0||to>=Math.ceil(issues.length/4);button.onclick=()=>{page=to;selectIssue(issues[page*4]);renderPage();};panel.append(button);}
+ const selectIssue=issue=>{selected=issue;shapeFocus=issue?.focus||null;$('shapeFocus').classList.toggle('position-advice',issue?.category==='writingPosition'&&issue?.adviceOnly===true);$('shapeIssueText').textContent=issue?(issue.adviceOnly||issue.layer==='beauty'?'きれいに かく ヒント：':'かきかたの れんしゅう：')+(issue.childText||'いろの ついた ところを、おてほんと みくらべよう。')+(issue.focus?'':'どの せんか、うまく わからなかったよ。おてほんと いっしょに みよう。'):'';renderShapeFocus();};
+ const renderPage=()=>{panel.replaceChildren();for(const issue of issues.slice(page*4,page*4+4)){const button=document.createElement('button');button.type='button';button.textContent=issue.childLabel||'ここを みよう';button.setAttribute('aria-pressed',String(issue===selected));button.onclick=()=>{selectIssue(issue);renderPage();};panel.append(button);}
+  if(issues.length>4)for(const [label,to] of [['まえの ところ',page-1],['つぎの ところ',page+1]]){const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=to<0||to>=Math.ceil(issues.length/4);button.onclick=()=>{page=to;selectIssue(issues[page*4]);renderPage();};panel.append(button);}
  };
- selectIssue(selected);renderPage();return issues.length?'見比べる候補が '+issues.length+'箇所 あります。赤い線の説明を 読もう。':'';
+ selectIssue(selected);renderPage();return issues.length?'いろの ついた ところを、ひとつずつ みよう。':'';
 }
 
 async function check(){if(reader?.active()){reader.judge();return;}
  if(!strokes.length||judged||busy)return;
- if(!modelReady){offerConfirmation('自動判定が使えないため、答えのお手本と比べて確認しよう。');return;}
- activeShapePolicy={settings:{...settings.shapeChecks},overrides:sanitizeOverrides(settings.shapeOverrides)};lastShape=null;busy=true;$('check').textContent='判定しています…';redraw();const requestToken=token;
+ if(!modelReady){offerConfirmation('じが うまく よめなかったよ。こたえの おてほんと みくらべよう。');return;}
+ activeShapePolicy={settings:{...settings.shapeChecks},overrides:sanitizeOverrides(settings.shapeOverrides)};lastShape=null;busy=true;$('check').textContent='じを よんでいるよ…';redraw();const requestToken=token;
  try{
   const predictions=await recognize();if(requestToken!==token)return;const best=predictions[0],recognized=homographs[best.char]||best.char;
-  if(best.confidence<.55){offerConfirmation('字の判定がはっきりしませんでした。誤答としては記録しません。お手本と比べて確認しよう。');return;}
+  if(best.confidence<.55){offerConfirmation('じが うまく よめなかったよ。まちがいには しないよ。おてほんと いっしょに たしかめよう。');return;}
   const reference=referenceStrokes(),analysis=analyzeCharacterWriting(current.char,strokes,reference,activeShapePolicy.settings);
   const shape=checkCharacterShape(current.char,strokes,reference,activeShapePolicy.settings,{overrides:activeShapePolicy.overrides});lastShape=shape;
   if(recognized===current.char){
    if(shape.status==='fail'){
-    feedback('もう少し！ 線の形を なおそう。\n'+showShapeIssues(shape)+'\n丸の中の 線の先・向き・つながりを 比べよう。');
+    feedback('もうすこし！\n'+showShapeIssues(shape));
     record({type:'wrong',hints,answerSeen,reason:shape.kind,recognized});return;
    }
    if(shape.status==='uncertain'){
-    offerConfirmation('「'+current.char+'」に見えました。\n'+(showShapeIssues(shape)||shape.text));return;
+    offerConfirmation('「'+current.char+'」に みえたよ。\n'+(showShapeIssues(shape)||shape.text));return;
    }
    const writing=shape.writingChecks?.filter(c=>!['pass','skipped','unavailable'].includes(c.status))||[];
    const practice=writing.filter(c=>!c.adviceOnly),referenceNotes=writing.filter(c=>c.adviceOnly);
-   if(practice.length&&analysis.type==='good'){analysis.type=practice[0].kind;analysis.text='書き方の練習で '+practice.length+'箇所、確かめよう。';}
-   const referenceText=referenceNotes.length?'\n参考の指摘：'+referenceNotes.length+'箇所（記録とは別）':'';
-   const beauty=shape.beautyChecks?.filter(c=>c.status!=='pass')||[];
-   const beautyText=beauty.length?'\n美文字のヒントが '+beauty.length+'箇所 あります。':'';
+   if(practice.length&&analysis.type==='good'){analysis.type=practice[0].kind;analysis.text=practice[0].childText||'まるの なかを、おてほんと みくらべよう。';}
+   const referenceText=referenceNotes.length?'\nもっと きれいに かく ヒントも あるよ。':'';
+   const beauty=[...(shape.beautyChecks||[]),...(shape.presentationHints||[])].filter(c=>!['pass','skipped','unavailable'].includes(c.status));
+   const beautyText=beauty.length&&!referenceNotes.length?'\nもっと きれいに かく ヒントも あるよ。':'';
    const issues=[...writing,...beauty];if(issues.length)showShapeIssues({checks:issues,focus:issues[0].focus,ruleId:issues[0].id});
-   feedback(`正解！${hints||answerSeen?' ヒントを使って思い出せたね。':' 自分の力で書けたね。'}\n${analysis.text}${referenceText}${beautyText}`,analysis.type==='good'?'good':'review');
+   feedback(`正解！${hints||answerSeen?' ヒントで おもいだせたね。':' じぶんの ちからで かけたね。'}\n${analysis.text}${referenceText}${beautyText}`,analysis.type==='good'?'good':'review');
    // Correct character with a stroke problem needs review; it is not counted as fluent mastery.
    const outcome={type:'correct',hints,answerSeen,reason:analysis.type==='good'?'':analysis.type,recognized,needsReview:analysis.type!=='good',beautyNotes:beauty.map(c=>c.id)};
    record(outcome);
   }else if(predictions.some(p=>(homographs[p.char]||p.char)===current.char&&p.confidence>.12)){
    offerConfirmation('似ている字の候補がありました。お手本と比べて確認しよう。');
   }else{
-   feedback(`「${recognized}」に見えました。\n答えは「${current.char}」。${analysis.type==='good'?'字の形の違いを比べてみよう。':analysis.text}`);answerSeen=true;renderGuide(true);record({type:'wrong',hints,answerSeen:true,reason:recognized!==current.char?'different-character':analysis.type,recognized});
+   feedback(`「${recognized}」に みえたよ。\nこたえは「${current.char}」。${analysis.type==='good'?'おてほんと、どこが ちがうか みてみよう。':analysis.text}`);answerSeen=true;renderGuide(true);record({type:'wrong',hints,answerSeen:true,reason:recognized!==current.char?'different-character':analysis.type,recognized});
   }
  }catch(e){if(requestToken!==token)return;offerConfirmation('自動判定が止まりました。今回は、お手本と比べて確認しよう。');console.warn(e);}
  finally{if(requestToken===token){busy=false;$('check').textContent='できた！ たしかめる 🌸';redraw();renderShapeFocus();if(!$('confirmation').hidden)$('check').disabled=true;}}
@@ -228,9 +233,9 @@ $('characterSelectNone').onclick=()=>{settings.characters=[];persist();syncChara
 $('selectAll').onclick=()=>{settings.selections[settings.grade]=units().map(u=>u.id);persist();renderUnits();refreshScope();};$('selectNone').onclick=()=>{settings.selections[settings.grade]=[];persist();renderUnits();refreshScope();};$('start').onclick=$('quickStart').onclick=begin;
 $('setupTab').onclick=$('back').onclick=$('finish').onclick=()=>{token++;busy=false;show('setupView');refreshScope();};$('progressTab').onclick=()=>{token++;busy=false;renderRecords();show('recordView');};$('restart').onclick=begin;
 $('undo').onclick=()=>{if(judged||busy)return;strokes.pop();shapeFocus=null;lastShape=null;$('shapeIssues').hidden=true;$('shapeIssueText').textContent='';redraw();};$('clear').onclick=()=>{if(judged||busy)return;strokes=[];drawing=null;shapeFocus=null;lastShape=null;$('shapeIssues').hidden=true;$('shapeIssueText').textContent='';redraw();};
-$('hint').onclick=()=>{if(judged||busy)return;hints++;renderGuide();if(reader?.active()){feedback('ひらがなの ヒントを ひとふで ふやしたよ。');return;}feedback(`${hints}画目まで表示しました。続きは自分で書いてみよう。`);};
-$('answer').onclick=()=>{if(judged||busy)return;answerSeen=true;renderGuide(true);if(reader?.active()){feedback('こたえは「'+current.reading+'」。こえに だして よんでみよう。');record({type:'answer',hints,answerSeen:true,reason:'answer'});return;}feedback(`答えは「${current.char}」。${data.glyphs[current.char].paths.length}画です。\n1画目から順番に見直そう。`);record({type:'answer',hints,answerSeen:true,reason:'answer'});};$('check').onclick=check;
-$('selfCorrect').onclick=()=>{feedback('お手本と比べて確認できたね。次はヒントなしで思い出そう。','good');record({type:'correct',hints,answerSeen:true,reason:'answer'});};$('selfWrong').onclick=()=>{feedback('もう一度練習する字として記録しました。');record({type:'wrong',hints,answerSeen:true,reason:'answer'});};
+$('hint').onclick=()=>{if(judged||busy)return;hints++;renderGuide();if(reader?.active()){feedback('ひらがなの ヒントを ひとふで ふやしたよ。');return;}feedback(`${hints}かくめまで みせたよ。つづきを かいてみよう。`);};
+$('answer').onclick=()=>{if(judged||busy)return;answerSeen=true;renderGuide(true);if(reader?.active()){feedback('こたえは「'+current.reading+'」。こえに だして よんでみよう。');record({type:'answer',hints,answerSeen:true,reason:'answer'});return;}feedback(`こたえは「${current.char}」。${data.glyphs[current.char].paths.length}かくだよ。\n1かくめから じゅんばんに みよう。`);record({type:'answer',hints,answerSeen:true,reason:'answer'});};$('check').onclick=check;
+$('selfCorrect').onclick=()=>{feedback('おてほんと みくらべられたね。つぎは ヒントなしで かこう。','good');record({type:'correct',hints,answerSeen:true,reason:'answer'});};$('selfWrong').onclick=()=>{feedback('また あとで、この じを れんしゅうしよう。');record({type:'wrong',hints,answerSeen:true,reason:'answer'});};
 $('next').onclick=()=>{queueIndex++;loadQuestion();};
 $('export').onclick=()=>{const blob=new Blob([JSON.stringify(store,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ひとふでヒント-学習記録.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
 $('import').onchange=async()=>{try{const file=$('import').files[0];if(!file)return;if(file.size>5e6)throw Error('記録ファイルが大きすぎます。');const incoming=validateProgress(JSON.parse(await file.text()));for(const [id,r] of Object.entries(incoming.records))if(!store.records[id]||(r.lastSeen||0)>(store.records[id].lastSeen||0))store.records[id]=r;persist();renderRecords();$('storageMessage').textContent='記録を読み込みました。新しい記録を優先してまとめています。';}catch(e){$('storageMessage').textContent='読み込めませんでした：'+e.message;}finally{$('import').value='';}};
@@ -252,16 +257,17 @@ try{
 function setupCharacterShapeSettings(){
  let rulePage=0;const filter=$('shapeRuleCategory');
  const select=$('shapeCharacter');for(const char of Object.keys(data.glyphs).sort((a,b)=>data.glyphs[a].grade-data.glyphs[b].grade||a.codePointAt(0)-b.codePointAt(0))){const o=document.createElement('option');o.value=char;o.textContent=char+'（'+data.glyphs[char].grade+'年）';select.append(o);}
- const names={writingPosition:'始点・終点の位置',writingPath:'線の経路・折れ曲がり',writingFinish:'終わりの向き',writingCrossing:'交差・突き出す長さ',writingSeparation:'線の離れ',beautyLayout:'全部品の位置・大きさ',beautyParallel:'横線の平行',beautySlope:'横線の右上がり',structure:'骨組み・線の過不足',structureContact:'線の接触（参考）',internalBars:'囲みの中の横線',identityLength:'字を区別する長短',identityExtent:'字を区別する突出',compactEnding:'短い終画',writingHook:'はねの形',writingSweep:'はらいの形',writingRise:'偏の払い上げ',writingBounds:'偏の縦線の上下',writingContact:'偏の線の接続',beautyLength:'美文字：線の長短',beautyAspect:'美文字：部品の幅',beautySpacing:'美文字：目の間隔'};
+ const names={beautyCenter:'たての中心線',beautySymmetry:'縦画から左右の長さ',writingPosition:'始点・終点の位置',writingPath:'線の経路・折れ曲がり',writingFinish:'終わりの向き',writingCrossing:'交差・突き出す長さ',writingSeparation:'線の離れ',beautyLayout:'全部品の位置・大きさ',beautyParallel:'横線の平行',beautySlope:'横線の右上がり',structure:'骨組み・線の過不足',structureContact:'線の接触（参考）',internalBars:'囲みの中の横線',identityLength:'字を区別する長短',identityExtent:'字を区別する突出',compactEnding:'短い終画',writingHook:'はねの形',writingSweep:'はらいの形',writingRise:'偏の払い上げ',writingBounds:'偏の縦線の上下',writingContact:'偏の線の接続',beautyLength:'美文字：線の長短',beautyAspect:'美文字：部品の幅',beautySpacing:'美文字：目の間隔'};
  function render(){const char=select.value,box=$('shapeCharacterRules');box.replaceChildren();const own=settings.shapeOverrides[char]||{categories:{},rules:{}};
   const add=(key,label,type,category)=>{const row=document.createElement('label'),title=document.createElement('span');title.textContent=label;const control=document.createElement('select');for(const [v,t] of [['','共通設定を使う'],['off','見ない'],['relaxed','ゆるめ'],['normal','標準'],['strict','厳しめ']]){const o=document.createElement('option');o.value=v;o.textContent=t;control.append(o);}control.value=own[type][key]||'';control.dataset.category=category;if(type==='rules')control.dataset.ruleId=key;const note=document.createElement('small');const actual=()=>{const global=settings.shapeChecks[category],value=global==='off'?'off':own.rules[type==='rules'?key:'']||own.categories[category]||global;note.textContent='実効値：'+({off:'見ない',relaxed:'ゆるめ',normal:'標準',strict:'厳しめ'}[value]||'見ない')+(global==='off'?'（共通設定が優先）':own[type][key]?'（この字の調整）':'（継承）');};actual();control.onchange=()=>{if(control.value)own[type][key]=control.value;else delete own[type][key];settings.shapeOverrides[char]=own;persist();actual();};row.append(title,control,note);box.append(row);};
   const all=rulesForCharacter(char),applicable=new Set(all.map(r=>r.category)),old=filter.value;
+  if(balancedReference(char,referenceStrokes(char))){applicable.add('beautyCenter');applicable.add('beautySymmetry');}
   filter.replaceChildren(...[...applicable].map(key=>new Option(names[key]||key,key)));filter.value=applicable.has(old)?old:applicable.has('writingPosition')?'writingPosition':[...applicable][0];
   const chosen=filter.value,rows=all.filter(r=>r.category===chosen),pages=Math.max(1,Math.ceil(rows.length/8));rulePage=Math.min(rulePage,pages-1);
   if(chosen)add(chosen,names[chosen]||chosen,'categories',chosen);
   for(const rule of rows.slice(rulePage*8,rulePage*8+8))add(rule.id,rule.label+'：'+rule.text,'rules',rule.category);
   const pager=$('shapeRulePager');pager.replaceChildren();for(const [text,to] of [['前へ',rulePage-1],[(rulePage+1)+'／'+pages+'頁（'+rows.length+'箇所）',rulePage],['次へ',rulePage+1]]){const button=document.createElement('button');button.type='button';button.textContent=text;button.disabled=to===rulePage||to<0||to>=pages;button.onclick=()=>{rulePage=to;render();};pager.append(button);}
-  $('shapeCharacterReview').href='shape-review.html?char='+encodeURIComponent(char)+'&category='+encodeURIComponent(chosen);
+  $('shapeCharacterReview').href='shape-review.html?char='+encodeURIComponent(char)+'&category='+encodeURIComponent(['beautyCenter','beautySymmetry'].includes(chosen)?'beautyLayout':chosen);
   $('resetCharacterShape').onclick=()=>{delete settings.shapeOverrides[char];persist();render();};
  }
  filter.onchange=()=>{rulePage=0;render();};select.onchange=()=>{rulePage=0;render();};render();for(const control of document.querySelectorAll('[data-shape-setting]'))control.addEventListener('change',render);$('resetShapeSettings').addEventListener('click',render);

@@ -3,9 +3,11 @@ import {bounds,dist,sub,norm,angle,nearest,intersections,focus} from './geometry
 
 export const DETAIL_LIMITS=Object.freeze({
  position:[.14,.10,.065],path:[.18,.13,.09],finish:[50,35,22],
- contact:[.10,.07,.045],crossing:[.13,.09,.06],separation:[.18,.13,.08],
+ contact:[.10,.07,.045],crossing:[.015,.025,.04],crossingGap:[.025,.018,.012],separation:[.18,.13,.08],
  length:[.50,.35,.22],component:[.18,.13,.085]
 });
+// Sparse characters allow more variation; these are reference hints, not letter identity rules.
+export function positionAllowance(strokes,level='normal'){return DETAIL_LIMITS.position[{relaxed:0,normal:1,strict:2}[level]??1]*(strokes<=2?1.8:strokes<=4?1.5:strokes<=6?1.25:1);}
 const at=(level,key)=>DETAIL_LIMITS[key][{relaxed:0,normal:1,strict:2}[level]??1];
 const status=(value,maximum,band)=>value>maximum+band?'fail':value>maximum-band?'uncertain':'pass';
 export function normalizedLines(lines){
@@ -53,8 +55,8 @@ export function evaluateDetail(ctx){
  }
  const [ref,other]=refs,[line,lineB]=drawn,a=ms[0];
  if(rule.kind==='detailStart'||rule.kind==='detailEnd'){
-  const end=rule.kind==='detailEnd',offset=dist(end?line.at(-1):line[0],end?ref.at(-1):ref[0]),maximum=at(level,'position'),point=end?a.points.at(-1):a.points[0];
-  return {status:status(offset,maximum,.015),confidence:'medium',reasonCode:end?'stroke-end-position':'stroke-start-position',observed:{distance:offset},expected:{maximum,unit:'character-size-ratio'},focus:focus([],a.indices,[point]),text:rule.text};
+  const end=rule.kind==='detailEnd',offset=dist(end?line.at(-1):line[0],end?ref.at(-1):ref[0]),maximum=positionAllowance(details.reference.length,level),point=end?a.points.at(-1):a.points[0];
+  return {status:status(offset,maximum,.015),confidence:'medium',reasonCode:end?'stroke-end-position':'stroke-start-position',observed:{distance:offset},expected:{maximum,unit:'character-size-ratio',referenceOnly:true},focus:focus([],a.indices,[point]),text:rule.strokeNumbers[0]+'画目の '+(end?'終わり':'始まり')+'の位置を、お手本と 見比べてもいいね。字の正解とは 別のヒントです。'};
  }
  if(rule.kind==='detailPath'){
   const distances=line.map((p,i)=>dist(p,ref[i])),maximum=at(level,'path'),worst=distances.indexOf(Math.max(...distances)),raw=resample(a.points,17);
@@ -73,9 +75,15 @@ export function evaluateDetail(ctx){
   const reference=pairFeature(ref,other),actual=pairFeature(line,lineB),type=rule.parameters.relation,anchors=closestPair(resample(ms[0].points,17),resample(ms[1].points,17)),focusPair=()=>focus([],ms.flatMap(m=>m.indices),[anchors.a,anchors.b]);
   let measured,maximum,reason;
   if(type==='C'){
-   // Small pen lifts at a crossing are tolerated. Large lost extensions or a
-   // crossing displaced along the lines remain visible as a review candidate.
-   measured=Math.max(actual.gap,Math.max(0,reference.depthA-actual.depthA),Math.max(0,reference.depthB-actual.depthB));maximum=at(level,'crossing');reason='crossing-and-extent';
+   // Establish the relation from the child's ink, not the reference arm lengths.
+   // A shorter but clearly crossing arm is still a valid crossing. Character-
+   // distinguishing extents and optional beauty lengths have separate rules.
+   const crossed=actual.hits.length>0;
+   const minimumDepth=Math.min(at(level,'crossing'),Math.min(reference.depthA,reference.depthB)*.25);
+   const depth=Math.min(actual.depthA,actual.depthB),maximumGap=at(level,'crossingGap');
+   const state=crossed?(depth>=minimumDepth?'pass':depth>.003?'uncertain':'fail'):(actual.gap<=maximumGap?'uncertain':'fail');
+   const text=crossed?(state==='pass'?'二本の線の 交差を 確認しました。':state==='uncertain'?'線は交差しています。交点が線の端に近いので、お手本と見比べよう。':'二本の線が 端で触れているように見えます。交差する所を お手本と 見比べよう。'):(state==='uncertain'?'交差する所の つながりが はっきりしません。線の端を お手本と 見比べよう。':'二本の線が 離れて見えます。交差する所を お手本と 見比べよう。');
+   return {status:state,confidence:'medium',reasonCode:crossed?'crossing-present':'crossing-gap',observed:{gap:actual.gap,crossed,depthA:actual.depthA,depthB:actual.depthB},expected:{relation:type,minimumDepth,maximumGap,unit:'character-size-ratio',referenceOnly:true},focus:focusPair(),text};
   }else if(type==='T'){
    measured=Math.max(actual.gap,Math.max(0,Math.min(actual.depthA,actual.depthB)-Math.min(reference.depthA,reference.depthB)));maximum=at(level,'contact');reason='touch-and-overshoot';
   }else if(type==='S'){

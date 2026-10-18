@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "engineVersion": "component-engine-3",
+  "engineVersion": "component-engine-5",
   "source": {
     "generator": "shape-details-1",
     "generatorSha256": "16e2045e54cba01cc25de5aa35efb0f5ad329919b0081dbe86e8787cd1130ffa",

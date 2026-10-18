@@ -13,9 +13,10 @@ export function detailRulesForCharacter(entry){
  }
  let k=0;
  for(let a=1;a<=reference.strokes;a++)for(let b=a+1;b<=reference.strokes;b++){
-  const relation=reference.relations[k++],name={C:'交差・突出',T:'接触・収まり',S:'離れ',O:'重なり'}[relation],category={C:'writingCrossing',T:'writingContact',S:'writingSeparation',O:'writingContact'}[relation];
+  const relation=reference.relations[k++],name={C:'交差',T:'接触・収まり',S:'離れ',O:'重なり'}[relation],category={C:'writingCrossing',T:'writingContact',S:'writingSeparation',O:'writingContact'}[relation];
   add('pair-'+a+'-'+b,'detailPair',category,'writing',[a,b],a+'・'+b+'画目の'+name+'（手本の特徴）',a+'・'+b+'画目の '+name+'を、赤い所と お手本で 比べよう。小さな違いは許容し、この形を必須とはしません。',{relation});
  }
+ for(const rule of rules)if(rule.kind==='detailPair'&&rule.parameters.relation==='C')rule.version=2;
  for(const part of entry.components){
   if(part.parentId===null)continue;const parent=entry.components.find(c=>c.id===part.parentId);if(!parent)continue;
   const numbers=[...part.strokes,...parent.strokes.filter(n=>!part.strokes.includes(n))];
